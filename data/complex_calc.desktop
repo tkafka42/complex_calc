@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Complex Calc
+Comment=Open-source CAS calculator (statistics, solve, graphs)
+Exec=complex-calc-gui
+Icon=complex_calc
+Terminal=false
+Categories=Education;Math;Science;
+Keywords=calculator;CAS;math;statistics;
+StartupWMClass=complex_calc
