@@ -410,3 +410,37 @@ def test_anova_2way_and_mult_reg(session):
     assert float(r["R²"]) == pytest.approx(0.991803, rel=1e-5)
     r = rows(session.evaluate("MultRegIntervals {3,5,7,9,12},{1,2,3,4,5},{0,1,0,1,1},{3,1}"))
     assert float(r["ŷ"]) == pytest.approx(7.2, rel=1e-6)
+
+
+def test_matrix_functions(calc):
+    assert calc("exp([0,1;0,0])") == "[[1,1][0,1]]"
+    assert calc("√([4,0;0,9])") == "[[2,0][0,3]]"
+    assert calc("sin({0,π/2})") == "{0,1}"   # lists stay element-wise
+
+
+def test_library(tmp_path, session, calc):
+    from complex_calc.library import refresh_libraries
+
+    (tmp_path / "linalg.txt").write_text(
+        "Define LibPub sq(x)=x^2\nDefine LibPriv helper(x)=x+1\n"
+        "Define LibPub twice(x)=Func\nReturn 2*helper(x)\nEndFunc\n", encoding="utf-8")
+    refresh_libraries(session, tmp_path)
+    assert calc("linalg\\sq(5)") == "25"
+    assert calc("linalg\\twice(3)") == "8"
+    assert calc('libShortcut("linalg","la")') == "{la.sq,la.twice}"
+    assert calc("la.sq(4)") == "16"
+
+
+def test_hardware_commands(session):
+    with pytest.raises(CalcError):
+        session.evaluate('Send "SET LIGHT ON"')
+
+
+def test_dashed_pen(session):
+    from complex_calc.functions.draw import render
+
+    session.evaluate("Define dash()=Prgm:SetPen 2,3:DrawLine 0,100,300,100:SetPen 1,2:DrawCircle 150,100,50:EndPrgm")
+    entry = session.run("dash()")
+    image = render(entry.drawing, scale=1)
+    row = [image.getpixel((x, 100)) for x in range(0, 300)]
+    assert (255, 255, 255) in row and (0, 0, 0) in row      # gaps in the dashed line

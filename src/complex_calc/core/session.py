@@ -117,6 +117,8 @@ class Session:
     # Called by Disp/Text/DispAt with each output line (in addition to Entry.output)
     output_listener: Callable[[str], None] | None = None
     locked: set[str] = field(default_factory=set)
+    libraries: dict[str, dict[str, tuple[Any, bool]]] = field(default_factory=dict)
+    lib_flags: dict[str, str] = field(default_factory=dict)  # name → LibPub/LibPriv (library documents)
     _output: list[str] = field(default_factory=list)
     canvas: Any = None
 
@@ -138,8 +140,17 @@ class Session:
         spec = lookup_builtin(name)
         if spec is not None:
             return not spec.command
-        value = self.variables.get(normalize_name(name))
+        value = self.lookup(name)
         return value is None or isinstance(value, (UserFunction, UserProgram))
+
+    def lookup(self, name: str) -> Any:
+        """Variable value, including library objects (lib\\obj)."""
+        key = normalize_name(name)
+        if "\\" in key:
+            lib, _, obj = key.partition("\\")
+            entry = self.libraries.get(lib, {}).get(obj)
+            return entry[0] if entry else None
+        return self.variables.get(key)
 
     def is_command(self, name: str) -> bool:
         spec = lookup_builtin(name)
@@ -231,7 +242,7 @@ class Evaluator:
         for scope in reversed(self.scopes):
             if key in scope:
                 return scope[key]
-        return self.session.variables.get(key)
+        return self.session.lookup(key)
 
     def store(self, name: str, value: Any) -> None:
         key = normalize_name(name)
@@ -387,6 +398,8 @@ class Evaluator:
         raise EvaluationError("Unknown statement")
 
     def exec_define(self, node: ast.DefineStmt) -> Any:
+        if node.library is not None:
+            self.session.lib_flags[normalize_name(node.name)] = node.library
         if node.kind in ("func", "prgm"):
             program = UserProgram(node.name, [normalize_name(p) for p in node.params], node.block or [],
                                   node.kind)
@@ -838,6 +851,12 @@ class Evaluator:
             raise ArgumentError("Too few arguments" if len(args) < len(program.params) else "Too many arguments")
         if len(self.scopes) > 200:
             raise EvaluationError("Too many nested calls")
+        library_scope = None
+        if program.library and program.library in self.session.libraries:
+            # objects of the same library document are visible without the lib\ prefix
+            library_scope = {k: v for k, (v, _) in self.session.libraries[program.library].items()}
+            self.scopes.append(library_scope)
+            self.in_func.append(False)
         self.scopes.append(dict(zip(program.params, args)))
         self.in_func.append(program.kind == "func")
         try:
@@ -852,6 +871,9 @@ class Evaluator:
         finally:
             self.scopes.pop()
             self.in_func.pop()
+            if library_scope is not None:
+                self.scopes.pop()
+                self.in_func.pop()
 
     def call_value(self, function: Any, args: list[Any]) -> Any:
         """Call a user function/program value (used by built-ins)."""
@@ -1002,6 +1024,10 @@ def _matrix_arith(op: str, a: Any, b: Any) -> Any:
             raise ArgumentError("Division by a matrix is not defined; use ^-1")
         return sp.ImmutableMatrix(a / b)
     if base == "^":
+        if a == sp.E and is_matrix(b):  # ℯ^(squareMatrix) is the matrix exponential
+            if not b.is_square:
+                raise ArgumentError("Dimension error: matrix must be square")
+            return sp.ImmutableMatrix(sp.Matrix(b).exp().applyfunc(sp.simplify))
         if not is_matrix(a) or is_matrix(b):
             raise ArgumentError("Data type error")
         if not a.is_square:

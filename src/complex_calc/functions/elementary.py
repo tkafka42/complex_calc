@@ -294,3 +294,50 @@ def t_expand(ctx, x):
 @builtin("tCollect", "tCollect(Expr)", 1, listable=(0,), summary="Collect trig products/powers into multiple angles")
 def t_collect(ctx, x):
     return sp.simplify(sp.fu(x, measure=lambda e: e.count_ops()))
+
+
+# ------------------------------------------------------------------ functions of square matrices
+# The reference guide defines sin(squareMatrix), ln(squareMatrix), √(squareMatrix) …
+# as matrix functions (not element by element). Lists are still mapped element-wise.
+
+def _matrix_function(spec_name: str, scalar):
+    from .registry import REGISTRY
+
+    spec = REGISTRY[spec_name.lower()]
+    original = spec.func
+
+    def func(ctx, x, *rest):
+        if hasattr(x, "is_square") and hasattr(x, "analytic_func"):
+            if not x.is_square:
+                raise DomainError("Dimension error: square matrix required")
+            t = sp.Dummy("t")
+            try:
+                result = x.analytic_func(scalar(ctx, t, *rest), t)
+            except (ValueError, NotImplementedError, ZeroDivisionError) as exc:
+                raise DomainError(f"Matrix function not defined: {exc}")
+            return sp.ImmutableMatrix(result.applyfunc(sp.simplify))
+        return original(ctx, x, *rest)
+
+    spec.func = func
+    spec.matrix_aware = True
+
+
+for _name, _scalar in {
+    "sin": lambda ctx, t: sp.sin(_to_radians(ctx, t)),
+    "cos": lambda ctx, t: sp.cos(_to_radians(ctx, t)),
+    "tan": lambda ctx, t: sp.tan(_to_radians(ctx, t)),
+    "sin⁻¹": lambda ctx, t: _from_radians(ctx, sp.asin(t)),
+    "cos⁻¹": lambda ctx, t: _from_radians(ctx, sp.acos(t)),
+    "tan⁻¹": lambda ctx, t: _from_radians(ctx, sp.atan(t)),
+    "sinh": lambda ctx, t: sp.sinh(t),
+    "cosh": lambda ctx, t: sp.cosh(t),
+    "tanh": lambda ctx, t: sp.tanh(t),
+    "sinh⁻¹": lambda ctx, t: sp.asinh(t),
+    "cosh⁻¹": lambda ctx, t: sp.acosh(t),
+    "tanh⁻¹": lambda ctx, t: sp.atanh(t),
+    "ln": lambda ctx, t: sp.log(t),
+    "log": lambda ctx, t, base=10: sp.log(t, base),
+    "√": lambda ctx, t: sp.sqrt(t),
+    "exp": lambda ctx, t: sp.exp(t),
+}.items():
+    _matrix_function(_name, _scalar)

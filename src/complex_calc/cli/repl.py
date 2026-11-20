@@ -29,6 +29,7 @@ Complex Calc — commands
   :digits N              display digits (Float N), default 6
   :vars                  show defined variables
   :clear                 delete all variables
+  :refreshlib            Refresh Libraries (MyLib folder, use lib\\name(...))
   :quit                  exit (also Ctrl+D)
 
 Keyboard shortcuts (as in the reference guide): sqrt( → √(  pi → π  @e → ℯ
@@ -127,6 +128,10 @@ def handle_command(session: Session, line: str) -> str | None:
             return "(no variables)"
         return "\n".join(f"{name} = {session.format(value)}" for name, value in sorted(session.variables.items())
                          if "\n" not in session.format(value))
+    if cmd in ("refreshlib", "refreshlibs"):
+        from ..library import library_folder, refresh_libraries
+
+        return "\n".join([f"Library folder: {library_folder()}", *refresh_libraries(session)])
     if cmd == "clear":
         session.clear_variables()
         return "Done"
@@ -175,6 +180,9 @@ def main(argv: list[str] | None = None) -> int:
             return None
 
     session.input_provider = ask
+    from ..library import refresh_libraries
+
+    refresh_libraries(session)
     if options.deg:
         session.settings.angle = "deg"
 

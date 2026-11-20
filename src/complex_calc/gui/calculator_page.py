@@ -262,8 +262,9 @@ class CalculatorPage(QWidget):
 
         self.menu = build_menu(self, MENU, self.on_menu_item)
         self.session.input_provider = self.ask_input
-        QShortcut(QKeySequence("Ctrl+M"), self, activated=self.open_menu)
-        QShortcut(QKeySequence("Ctrl+L"), self, activated=self.clear_history)
+        for keys, slot in (("Ctrl+M", self.open_menu), ("Ctrl+L", self.clear_history)):
+            shortcut = QShortcut(QKeySequence(keys), self, activated=slot)
+            shortcut.setContext(Qt.WidgetWithChildrenShortcut)
         self.entry.setFocus()
 
     # ------------------------------------------------------------ actions
@@ -376,6 +377,20 @@ class CalculatorPage(QWidget):
             self.open_program_editor()
         elif item.action == "recall_definition":
             self.recall_definition()
+        elif item.action == "refresh_libraries":
+            from ..library import refresh_libraries
+
+            messages = refresh_libraries(self.session)
+            self.add_history_item(Entry("Refresh Libraries", "\n".join(messages) or "Done"))
+        elif item.action == "open_library_folder":
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+
+            from ..library import library_folder
+
+            folder = library_folder()
+            folder.mkdir(parents=True, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
         elif item.insert:
             self.entry.insert_text(item.insert)
         self.entry.setFocus()

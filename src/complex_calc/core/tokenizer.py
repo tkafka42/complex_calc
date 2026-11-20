@@ -264,6 +264,8 @@ def tokenize(source: str) -> list[Token]:
                     i += 1
                 elif c == "." and i + 1 < n and _is_ident_start(source[i + 1]):
                     i += 1  # dotted names such as stat.RegEqn
+                elif c == "\\" and i + 1 < n and _is_ident_start(source[i + 1]):
+                    i += 1  # library objects such as linalg\\gauss
                 elif c == "°" and source[i - 1] == "_":  # temperature units _°C
                     i += 1
                 elif c == "χ" or (source[i - 1] == "χ" and c in "²2"):

@@ -58,12 +58,21 @@ class MainWindow(QMainWindow):
         self.store = QSettings("complex_calc", "complex_calc")
         self.session = Session()
         self._load_settings()
+        from ..library import refresh_libraries
+
+        refresh_libraries(self.session)
 
         self.tabs = QTabWidget()
         self.calculator = CalculatorPage(self.session)
         self.tabs.addTab(self.calculator, "Calculator")
-        self.tabs.addTab(_placeholder("Graphs — coming in milestone M4"), "Graphs")
-        self.tabs.addTab(_placeholder("Lists & Spreadsheet — coming in milestone M5"), "Lists && Spreadsheet")
+        from .graphs_page import GraphsPage
+
+        self.graphs = GraphsPage(self.session)
+        self.tabs.addTab(self.graphs, "Graphs")
+        from .lists_page import ListsPage
+
+        self.lists = ListsPage(self.session, self.graphs)
+        self.tabs.addTab(self.lists, "Lists && Spreadsheet")
         self.setCentralWidget(self.tabs)
 
         self._build_menu_bar()

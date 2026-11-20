@@ -106,12 +106,19 @@ memory:
 
 ## Not implemented
 
-- `Define LibPub`/`LibPriv`: the syntax is accepted, but there is no library
-  system and no `libShortcut()`.
+- Libraries are plain text files in `~/.local/share/complex_calc/MyLib/*.txt`.
+  They are not .tns documents.
 - `RefreshProbeVars` (Vernier sensors).
 - Hub commands (`Send`, `Get`, `GetStr`, `eval`).
 - The Unit System setting (SI/Eng-US), Vector Format display, and the
   remaining entries of the units catalog. Common units and all constants from
   the guide are there.
-- Graphs, Geometry, Lists & Spreadsheet, Data & Statistics, Notes and Python
-  apps. Graphs and Lists are planned as milestones M4/M5.
+- Apps not built: Geometry, Data & Statistics, Notes, Vernier DataQuest,
+  Question and Python. Documents (.tns files) are not supported either.
+- **Graphs app:**
+  - the menu numbering is from memory
+  - missing: equation, sequence, differential equation and inequality plots,
+    Zoom – Box/User, and Geometry tools
+- **Lists & Spreadsheet app:**
+  - missing: Insert menu, Data Capture, and the Table menu
+  - statistics results are written as text columns

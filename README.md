@@ -67,8 +67,23 @@ shortcuts and the order of evaluation (EOS™). The guide's catalog has about
   `PlotXY`, `SetColor`, `SetWindow`, and more, drawn on a 318×212 canvas.
 - **Numbered menu** (Ctrl+M) with assistant dialogs. The submenu order of the
   statistics menus follows the official eGuide.
+- **Graphs page:**
+  - function, parametric, polar and scatter plots (f1…f99, shared with the
+    Calculator)
+  - Window/Zoom and Trace
+  - Analyze Graph: zero, minimum, maximum, intersection, inflection, dy/dx,
+    integral; you click the lower and the upper bound
+  - split-screen table
+  - linear, semi-log and log-log axes
+- **Lists & Spreadsheet page:**
+  - named columns are list variables shared with the Calculator
+  - column formulas (`=seq(n^2,n,1,10)`, `=a*2`) and cell formulas (`=a1+b1`)
+  - statistics wizards that write their results into the sheet
+  - Sort, Fill, Generate Sequence, and Quick Graph (scatter plot on the
+    Graphs page)
+- **Libraries:** documents in the MyLib folder with `Define LibPub`. Use them
+  as `lib\name(…)` or with `libShortcut`.
 - **REPL** for the terminal.
-- Planned: Graphs page (M4), Lists & Spreadsheet page (M5).
 
 Command names and variable names are case-insensitive (`NORMCDF` = `normCdf`).
 As on the handheld, the letters `e` and `i` are ordinary variables. Use `ℯ`

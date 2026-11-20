@@ -227,6 +227,40 @@ def paint_buffer(ctx):
 # ------------------------------------------------------------------ rendering (Pillow)
 
 
+def _ellipse_points(x, y, w, h, start=0.0, sweep=360.0, steps=96):
+    import math
+
+    cx, cy, rx, ry = x + w / 2, y + h / 2, w / 2, h / 2
+    return [(cx + rx * math.cos(math.radians(start + sweep * k / steps)),
+             cy - ry * math.sin(math.radians(start + sweep * k / steps))) for k in range(steps + 1)]
+
+
+def _styled_line(draw, points, color, width, style, scale):
+    """Smooth (1), dotted (2) or dashed (3) polyline."""
+    import math
+
+    if style == 1:
+        draw.line(points, fill=color, width=width, joint="curve")
+        return
+    on, off = (1.5 * scale, 3 * scale) if style == 2 else (6 * scale, 4 * scale)
+    pattern_pos, drawing = 0.0, True
+    for (x1, y1), (x2, y2) in zip(points, points[1:]):
+        length = math.hypot(x2 - x1, y2 - y1)
+        t = 0.0
+        while t < length:
+            segment = (on if drawing else off) - pattern_pos
+            step = min(segment, length - t)
+            if drawing:
+                a = t / length if length else 0
+                b = (t + step) / length if length else 0
+                draw.line([(x1 + (x2 - x1) * a, y1 + (y2 - y1) * a), (x1 + (x2 - x1) * b, y1 + (y2 - y1) * b)],
+                          fill=color, width=width)
+            t += step
+            pattern_pos += step
+            if pattern_pos >= (on if drawing else off) - 1e-9:
+                pattern_pos, drawing = 0.0, not drawing
+
+
 def render(ops: list[tuple], scale: int = 2):
     """Render drawing operations to a Pillow image (scaled for sharpness)."""
     from PIL import Image, ImageDraw
@@ -236,6 +270,9 @@ def render(ops: list[tuple], scale: int = 2):
 
     def s(v):
         return v * scale
+
+    def outline(points, color, width, style):
+        _styled_line(draw, [(s(x), s(y)) for x, y in points], color, width, style, scale)
 
     for op in ops:
         kind, color, thickness, style = op[:4]
@@ -249,31 +286,33 @@ def render(ops: list[tuple], scale: int = 2):
                 x, y, w, h = box
                 draw.rectangle([s(x), s(y), s(x + w), s(y + h)], fill=(255, 255, 255))
         elif kind == "line":
-            (x1, y1), (x2, y2) = data[0]
-            draw.line([s(x1), s(y1), s(x2), s(y2)], fill=color, width=width)
+            outline(data[0], color, width, style)
         elif kind in ("polygon", "polyline"):
-            points = [(s(x), s(y)) for x, y in data[0]]
             if kind == "polygon":
-                draw.polygon(points, fill=color)
+                draw.polygon([(s(x), s(y)) for x, y in data[0]], fill=color)
             else:
-                draw.line(points + points[:1], fill=color, width=width)
+                outline(list(data[0]) + list(data[0][:1]), color, width, style)
         elif kind == "rect":
             (x, y, w, h), fill = data
-            box = [s(x), s(y), s(x + w), s(y + h)]
-            draw.rectangle(box, fill=color) if fill else draw.rectangle(box, outline=color, width=width)
+            if fill:
+                draw.rectangle([s(x), s(y), s(x + w), s(y + h)], fill=color)
+            else:
+                outline([(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)], color, width, style)
         elif kind == "ellipse":
             (x, y, w, h), fill = data
-            box = [s(x), s(y), s(x + w), s(y + h)]
-            draw.ellipse(box, fill=color) if fill else draw.ellipse(box, outline=color, width=width)
+            if fill:
+                draw.ellipse([s(x), s(y), s(x + w), s(y + h)], fill=color)
+            else:
+                outline(_ellipse_points(x, y, w, h), color, width, style)
         elif kind == "arc":
             (x, y, w, h), start, sweep, fill = data
-            box = [s(x), s(y), s(x + w), s(y + h)]
-            # handheld: counter-clockwise from 3 o'clock; Pillow: clockwise
-            a0, a1 = sorted((-start - sweep, -start))
+            # handheld: angles in degrees, counter-clockwise from 3 o'clock
+            points = _ellipse_points(x, y, w, h, start, sweep)
             if fill:
-                draw.pieslice(box, a0, a1, fill=color)
+                cx, cy = x + w / 2, y + h / 2
+                draw.polygon([(s(cx), s(cy))] + [(s(px), s(py)) for px, py in points], fill=color)
             else:
-                draw.arc(box, a0, a1, fill=color, width=width)
+                outline(points, color, width, style)
         elif kind == "text":
             (x, y), text = data
             draw.text((s(x), s(y) - 12 * scale), text, fill=color, font_size=11 * scale)

@@ -338,7 +338,13 @@ MENU: list[MenuItem] = [
         M("4", "Clear a-z...", action="clear_az"),
         M("5", "Clear History", action="clear_history"),
         M("6", "Insert Comment", insert="©"),
-        _off("7", "Library"),
+        M("7", "Library", children=[
+            M("1", "Refresh Libraries", action="refresh_libraries"),
+            M("2", "Open Library Folder", action="open_library_folder"),
+            M("3", "Create Shortcuts", insert="libShortcut("),
+            M("4", "Define LibPub", insert="Define LibPub "),
+            M("5", "Define LibPriv", insert="Define LibPriv "),
+        ]),
         M("8", "Lock", children=[
             M("1", "Lock Variable", insert="Lock "),
             M("2", "Unlock Variable", insert="unLock "),
@@ -681,3 +687,100 @@ def render_tree(items: list[MenuItem] | None = None, indent: int = 0, max_depth:
         if item.children and indent + 1 < max_depth:
             lines.append(render_tree(item.children, indent + 1, max_depth))
     return "\n".join(lines)
+
+
+# ------------------------------------------------------------------ Graphs page menu
+# Numbering of the Graphs application menu is reconstructed from memory (unsure).
+
+GRAPHS_MENU: list[MenuItem] = [
+    M("1", "Actions", unsure=True, children=[
+        M("1", "Delete All Functions", action="g_clear"),
+        M("2", "Hide/Show Function List", action="g_toggle_list"),
+    ]),
+    M("2", "View", unsure=True, children=[
+        M("1", "Hide/Show Entry Line", action="g_toggle_entry"),
+        M("2", "Show/Hide Grid", action="g_toggle_grid"),
+        M("3", "Show/Hide Axes", action="g_toggle_axes"),
+    ]),
+    M("3", "Graph Entry/Edit", unsure=True, children=[
+        M("1", "Function", action="g_entry_function"),
+        _off("2", "Equation"),
+        M("3", "Parametric", action="g_entry_parametric"),
+        M("4", "Polar", action="g_entry_polar"),
+        M("5", "Scatter Plot", action="g_entry_scatter"),
+        _off("6", "Sequence"),
+        _off("7", "Diff Eq"),
+    ]),
+    M("4", "Window/Zoom", unsure=True, children=[
+        M("1", "Window Settings...", action="g_window"),
+        _off("2", "Zoom – Box"),
+        M("3", "Zoom – In", action="g_zoom_in"),
+        M("4", "Zoom – Out", action="g_zoom_out"),
+        M("5", "Zoom – Standard", action="g_zoom_standard"),
+        M("6", "Zoom – Quadrant 1", action="g_zoom_quadrant1"),
+        _off("7", "Zoom – User"),
+        M("8", "Zoom – Trig", action="g_zoom_trig"),
+        M("9", "Zoom – Data", action="g_zoom_data"),
+        M("A", "Zoom – Fit", action="g_zoom_fit"),
+        M("B", "Zoom – Square", action="g_zoom_square"),
+    ]),
+    M("5", "Trace", unsure=True, children=[
+        M("1", "Graph Trace", action="g_trace"),
+    ]),
+    M("6", "Analyze Graph", unsure=True, children=[
+        M("1", "Zero", action="g_zero"),
+        M("2", "Minimum", action="g_minimum"),
+        M("3", "Maximum", action="g_maximum"),
+        M("4", "Intersection", action="g_intersection"),
+        M("5", "Inflection", action="g_inflection"),
+        M("6", "dy/dx", action="g_dydx"),
+        M("7", "Integral", action="g_integral"),
+    ]),
+    M("7", "Table", unsure=True, children=[
+        M("1", "Split-screen Table", action="g_table"),
+        M("2", "Remove Table", action="g_table_remove"),
+        M("3", "Edit Table Settings...", action="g_table_settings"),
+    ]),
+    _off("8", "Geometry", unsure=True),
+    M("9", "Settings", unsure=True, children=[
+        M("1", "Axes: linear", action="g_scale_linear"),
+        M("2", "Axes: semi-log (y logarithmic)", action="g_scale_semilogy"),
+        M("3", "Axes: semi-log (x logarithmic)", action="g_scale_semilogx"),
+        M("4", "Axes: log-log", action="g_scale_loglog"),
+    ]),
+]
+
+
+# ------------------------------------------------------------------ Lists & Spreadsheet page menu
+# Statistics submenu order (Stat Calculations, Distributions, Confidence Intervals,
+# Stat Tests) follows the eGuide's Lists & Spreadsheet chapter; other numbers are unsure.
+
+def _lists_menu() -> list[MenuItem]:
+    statistics = find_path("6")
+    return [
+        M("1", "Actions", unsure=True, children=[
+            M("1", "Clear Column Data", action="l_clear_column"),
+            M("2", "Delete Column Name", action="l_delete_name"),
+        ]),
+        _off("2", "Insert", unsure=True),
+        M("3", "Data", unsure=True, children=[
+            M("1", "Generate Sequence", action="l_sequence"),
+            _off("2", "Data Capture"),
+            M("3", "Fill", action="l_fill"),
+            M("4", "Quick Graph", action="l_quick_graph"),
+            M("5", "Sort", children=[
+                M("1", "Ascending", action="l_sort_asc"),
+                M("2", "Descending", action="l_sort_desc"),
+            ]),
+        ]),
+        M("4", "Statistics", children=[
+            M("1", "Stat Calculations", children=find_path("6", "1").children),
+            M("2", "Distributions", children=find_path("6", "5").children),
+            M("3", "Confidence Intervals", children=find_path("6", "6").children),
+            M("4", "Stat Tests", children=find_path("6", "7").children),
+        ]) if statistics else _off("4", "Statistics"),
+        _off("5", "Table", unsure=True),
+    ]
+
+
+LISTS_MENU: list[MenuItem] = _lists_menu()

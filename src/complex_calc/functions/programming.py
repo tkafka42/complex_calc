@@ -263,3 +263,46 @@ def set_mode(ctx, mode, value=None):
         return sp.Integer(_set_mode(ctx.settings, to_int(mode, "mode"), to_int(value, "setting")))
     except KeyError:
         raise DomainError("Invalid setting")
+
+
+# ------------------------------------------------------------------ libraries
+
+
+@builtin("libShortcut", "libShortcut(LibNameString,ShortcutNameString[,LibPrivFlag])", 2, 3,
+         summary="Create short.name references to the objects of a library")
+def lib_shortcut(ctx, lib_name, short_name, priv_flag=None):
+    if not isinstance(lib_name, StringValue) or not isinstance(short_name, StringValue):
+        raise ArgumentError("libShortcut needs two strings")
+    library = ctx.session.libraries.get(str(lib_name).lower())
+    if library is None:
+        raise EvaluationError(f'Library "{lib_name}" not found (put it in MyLib and refresh libraries)')
+    include_private = priv_flag is not None and to_float(priv_flag, "LibPrivFlag") != 0
+    names = []
+    for obj, (value, public) in sorted(library.items()):
+        if public or include_private:
+            full = f"{short_name}.{obj}"
+            ctx.session.variables[full.lower()] = value
+            names.append(sp.Symbol(full))
+    return ListValue(names)
+
+
+# ------------------------------------------------------------------ hardware commands (not available on a PC)
+
+
+def _hardware(name: str, signature: str, what: str):
+    @builtin(name, signature, 0, 99, command=True, raw=tuple(range(99)), summary=f"{what} (needs hardware)")
+    def command(ctx, *args):
+        raise EvaluationError(f"{name}: {what} is not connected")
+
+    return command
+
+
+_hardware("Send", 'Send exprOrString1[,exprOrString2]…', "TI-Innovator™ Hub")
+_hardware("Get", "Get [promptString,]var[,statusVar]", "TI-Innovator™ Hub")
+_hardware("GetStr", "GetStr [promptString,]var[,statusVar]", "TI-Innovator™ Hub")
+_hardware("RefreshProbeVars", "RefreshProbeVars", "Vernier DataQuest™ sensor")
+
+
+@builtin("eval", "eval(Expr)", 1, summary="Expression as a string (for Hub commands)")
+def eval_(ctx, value):
+    return StringValue(_text(ctx, value))

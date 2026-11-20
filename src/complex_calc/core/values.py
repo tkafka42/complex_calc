@@ -80,6 +80,7 @@ class UserProgram:
     block: list[Any]
     kind: str  # "func" | "prgm"
     source: str = ""
+    library: str | None = None  # library document the program belongs to
 
 
 def is_matrix(value: Any) -> bool:
