@@ -34,6 +34,8 @@ SHORTCUTS = """<table>
 <tr><td><b>↑ / ↓</b></td><td>recall previous inputs</td></tr>
 <tr><td><b>Click</b></td><td>an input or result in the history to paste it</td></tr>
 <tr><td><b>Ctrl+L</b></td><td>clear history</td></tr>
+<tr><td><b>Ctrl+E</b></td><td>Program Editor (Func/Prgm); Ctrl+B stores</td></tr>
+<tr><td><b>@e @i @&gt; @t</b></td><td>type ℯ, ⅈ, ►, ᵀ (as on the handheld's computer keyboard)</td></tr>
 </table>"""
 
 
@@ -71,20 +73,41 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geometry)
 
     # ------------------------------------------------------------ settings
+    SAVED = ("mode", "angle", "complex_format", "exp_format", "base", "display", "letters_are_constants")
+
     def _load_settings(self):
-        s = self.session.settings
-        s.mode = str(self.store.value("mode", "auto"))
-        s.angle = str(self.store.value("angle", "rad"))
-        try:
-            s.digits = int(self.store.value("digits", 6))
-        except (TypeError, ValueError):
-            s.digits = 6
+        for name in self.SAVED:
+            value = self.store.value(name)
+            if value is None:
+                continue
+            if name == "letters_are_constants":
+                value = str(value).lower() == "true"
+            self._apply(name, value)
 
     def _save_settings(self):
+        for name in self.SAVED:
+            self.store.setValue(name, self._current(name))
+
+    def _current(self, name: str):
         s = self.session.settings
-        self.store.setValue("mode", s.mode)
-        self.store.setValue("angle", s.angle)
-        self.store.setValue("digits", s.digits)
+        if name == "display":
+            if s.fix is not None:
+                return f"Fix{s.fix}"
+            return "Float" if s.float_full else f"Float{s.digits}"
+        return getattr(s, name)
+
+    def _apply(self, name: str, value) -> None:
+        s = self.session.settings
+        if name == "display":
+            value = str(value)
+            if value.startswith("Fix"):
+                s.fix = int(value[3:])
+            elif value == "Float":
+                s.fix, s.float_full, s.digits = None, True, 12
+            else:
+                s.fix, s.float_full, s.digits = None, False, int(value[5:] or 6)
+        else:
+            setattr(s, name, value)
 
     def closeEvent(self, event):  # noqa: N802
         self._save_settings()
@@ -98,12 +121,31 @@ class MainWindow(QMainWindow):
         quit_action = QAction("Quit", self, shortcut=QKeySequence.Quit, triggered=self.close)
         file_menu.addAction(quit_action)
 
-        settings = bar.addMenu("&Settings")
-        self.mode_actions = self._radio_group(settings, "Calculation Mode", [
+        file_menu.insertAction(quit_action, QAction("Program Editor…", self, shortcut=QKeySequence("Ctrl+E"),
+                                                    triggered=lambda: self.calculator.open_program_editor()))
+        file_menu.insertSeparator(quit_action)
+
+        settings = bar.addMenu("&Settings")  # order as in the handheld's Document Settings
+        self.groups: dict[str, dict] = {}
+        self.groups["display"] = self._radio_group(
+            settings, "Display Digits",
+            [("Float", "Float")] + [(f"Float {d}", f"Float{d}") for d in range(1, 13)]
+            + [(f"Fix {d}", f"Fix{d}") for d in range(0, 13)], "display")
+        self.groups["angle"] = self._radio_group(settings, "Angle", [("Radian", "rad"), ("Degree", "deg"),
+                                                                     ("Gradian", "grad")], "angle")
+        self.groups["exp_format"] = self._radio_group(settings, "Exponential Format", [
+            ("Normal", "normal"), ("Scientific", "scientific"), ("Engineering", "engineering")], "exp_format")
+        self.groups["complex_format"] = self._radio_group(settings, "Real or Complex Format", [
+            ("Real", "real"), ("Rectangular", "rectangular"), ("Polar", "polar")], "complex_format")
+        self.groups["mode"] = self._radio_group(settings, "Calculation Mode", [
             ("Auto", "auto"), ("Exact", "exact"), ("Approximate", "approx")], "mode")
-        self.angle_actions = self._radio_group(settings, "Angle", [("Radian", "rad"), ("Degree", "deg")], "angle")
-        self.digit_actions = self._radio_group(settings, "Display Digits",
-                                               [(f"Float {d}", d) for d in (2, 3, 4, 5, 6, 8, 10, 12)], "digits")
+        self.groups["base"] = self._radio_group(settings, "Base", [
+            ("Decimal", "dec"), ("Hex", "hex"), ("Binary", "bin")], "base")
+        settings.addSeparator()
+        letters = QAction("Typed e and i are constants (not on the handheld)", self, checkable=True)
+        letters.setChecked(self.session.settings.letters_are_constants)
+        letters.toggled.connect(lambda on: self.set_setting("letters_are_constants", on))
+        settings.addAction(letters)
 
         help_menu = bar.addMenu("&Help")
         help_menu.addAction(QAction("Keyboard Shortcuts", self, triggered=lambda: QMessageBox.information(
@@ -116,7 +158,7 @@ class MainWindow(QMainWindow):
         actions = {}
         for label, value in options:
             action = QAction(label, self, checkable=True)
-            action.setChecked(getattr(self.session.settings, attribute) == value)
+            action.setChecked(self._current(attribute) == value)
             action.triggered.connect(lambda checked=False, v=value: self.set_setting(attribute, v))
             group.addAction(action)
             submenu.addAction(action)
@@ -124,10 +166,9 @@ class MainWindow(QMainWindow):
         return actions
 
     def set_setting(self, attribute: str, value):
-        setattr(self.session.settings, attribute, value)
-        for actions, attr in ((self.mode_actions, "mode"), (self.angle_actions, "angle"),
-                              (self.digit_actions, "digits")):
-            current = getattr(self.session.settings, attr)
+        self._apply(attribute, value)
+        for name, actions in getattr(self, "groups", {}).items():
+            current = self._current(name)
             if current in actions:
                 actions[current].setChecked(True)
         self._save_settings()
@@ -152,12 +193,15 @@ class MainWindow(QMainWindow):
     def _update_status(self):
         s = self.session.settings
         self.mode_button.setText({"auto": "AUTO", "exact": "EXACT", "approx": "APPROX"}[s.mode])
-        self.angle_button.setText("RAD" if s.angle == "rad" else "DEG")
-        self.digits_label.setText(f"Float {s.digits}")
+        self.angle_button.setText({"rad": "RAD", "deg": "DEG", "grad": "GRAD"}[s.angle])
+        display = self._current("display")
+        self.digits_label.setText(display.replace("Float", "Float ").replace("Fix", "Fix ").strip()
+                                  + ("  ·  ℂ" if s.complex_format != "real" else "  ·  ℝ"))
 
     def _cycle_mode(self):
         order = ["auto", "exact", "approx"]
         self.set_setting("mode", order[(order.index(self.session.settings.mode) + 1) % 3])
 
     def _toggle_angle(self):
-        self.set_setting("angle", "deg" if self.session.settings.angle == "rad" else "rad")
+        order = ["rad", "deg", "grad"]
+        self.set_setting("angle", order[(order.index(self.session.settings.angle) + 1) % 3])

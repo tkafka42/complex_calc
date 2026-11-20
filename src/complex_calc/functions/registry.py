@@ -26,6 +26,8 @@ class Context:
     settings: Any
     store: Callable[[str, Any], None]
     lookup: Callable[[str], Any]
+    session: Any = None
+    evaluator: Any = None
 
 
 @dataclass
@@ -42,6 +44,9 @@ class Builtin:
     aliases: tuple[str, ...] = ()
     summary: str = ""
     exact: bool = False  # result is exact even if the input contained decimals
+    raw: tuple[int, ...] = ()  # argument positions passed unevaluated (AST nodes)
+    complex: bool = False  # complex results allowed in Real mode (cSolve, cZeros, ...)
+    matrix_aware: bool = False  # receives matrices itself instead of element-wise mapping
 
 
 REGISTRY: dict[str, Builtin] = {}
@@ -60,6 +65,9 @@ def builtin(
     listable: tuple[int, ...] = (),
     summary: str = "",
     exact: bool = False,
+    raw: tuple[int, ...] = (),
+    complex: bool = False,
+    matrix_aware: bool = False,
 ):
     """Decorator registering `func(ctx, *args)` as a built-in."""
 
@@ -77,6 +85,9 @@ def builtin(
             aliases=aliases,
             summary=summary,
             exact=exact,
+            raw=raw,
+            complex=complex,
+            matrix_aware=matrix_aware,
         )
         for key in (name, *aliases):
             REGISTRY[key.lower()] = spec

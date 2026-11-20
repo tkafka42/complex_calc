@@ -24,14 +24,19 @@ Complex Calc — commands
   :list                  all functions and commands
   :menu [keys]           show the numbered menu, e.g. :menu 6 5
   :mode auto|exact|approx
-  :angle rad|deg
+  :angle rad|deg|grad
+  :complex real|rectangular|polar
   :digits N              display digits (Float N), default 6
   :vars                  show defined variables
   :clear                 delete all variables
   :quit                  exit (also Ctrl+D)
 
-Input shortcuts: sqrt( for √(, pi for π, e^( for ℯ^(, i for ⅈ, inf for ∞,
-<= >= /= for ≤ ≥ ≠, -> or =: for →, x̄ can be written as xbar in wizards only.
+Keyboard shortcuts (as in the reference guide): sqrt( → √(  pi → π  @e → ℯ
+@i → ⅈ  infinity → ∞  <= >= /= → ≤ ≥ ≠  =: → →  => → ⇒  @> → ►  @t → ᵀ
+derivative( → d(  integral( → ∫(  sumSeq( → Σ(  deltaList( → ΔList(
+Note: like on the handheld, the letters e and i are ordinary variables.
+Programs: separate statements with ":" e.g.
+  Define f(n)=Func:If n≤1 Then:Return 1:Else:Return n*f(n-1):EndIf:EndFunc
 """
 
 
@@ -67,7 +72,8 @@ def _setup_readline():
 
 def _settings_line(session: Session) -> str:
     s = session.settings
-    return f"mode={s.mode}  angle={s.angle}  digits=Float {s.digits}"
+    digits = f"Fix {s.fix}" if s.fix is not None else f"Float {s.digits}"
+    return f"mode={s.mode}  angle={s.angle}  complex={s.complex_format}  digits={digits}"
 
 
 def handle_command(session: Session, line: str) -> str | None:
@@ -105,8 +111,12 @@ def handle_command(session: Session, line: str) -> str | None:
             session.settings.mode = "approx" if args[0].lower().startswith("approx") else args[0].lower()
         return _settings_line(session)
     if cmd == "angle":
-        if args and args[0].lower() in ("rad", "deg", "radian", "degree"):
-            session.settings.angle = args[0].lower()[:3]
+        if args and args[0].lower() in ("rad", "deg", "grad", "radian", "degree", "gradian"):
+            session.settings.angle = {"r": "rad", "d": "deg", "g": "grad"}[args[0].lower()[0]]
+        return _settings_line(session)
+    if cmd == "complex":
+        if args and args[0].lower() in ("real", "rectangular", "polar"):
+            session.settings.complex_format = args[0].lower()
         return _settings_line(session)
     if cmd == "digits":
         if args and args[0].isdigit() and 1 <= int(args[0]) <= 12:
@@ -132,7 +142,18 @@ def process_line(session: Session, line: str) -> str | None:
     force_approx = False
     if line.startswith("~"):
         force_approx, line = True, line[1:].strip()
-    return session.run(line, force_approx=force_approx).text
+    entry = session.run(line, force_approx=force_approx)
+    lines = [*entry.output]
+    if entry.drawing:
+        import tempfile
+
+        from ..functions.draw import render
+
+        path = tempfile.NamedTemporaryFile(prefix="complex_calc_drawing_", suffix=".png", delete=False).name
+        render(entry.drawing).save(path)
+        lines.append(f"(graphics saved to {path})")
+    lines.append(entry.text)
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -143,6 +164,17 @@ def main(argv: list[str] | None = None) -> int:
     options = parser.parse_args(argv)
 
     session = Session()
+
+    def ask(prompt: str, as_string):
+        if as_string is None:  # Text
+            print("  " + prompt)
+            return ""
+        try:
+            return input(f"  {prompt} ")
+        except EOFError:
+            return None
+
+    session.input_provider = ask
     if options.deg:
         session.settings.angle = "deg"
 

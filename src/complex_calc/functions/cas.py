@@ -272,7 +272,7 @@ def solve_(ctx, eq, var):
     return _solve(eq, var, complex_=False)
 
 
-@builtin("cSolve", "cSolve(Equation,Var[=Guess])  |  cSolve(Eqn1 and Eqn2,{Var1,Var2})", 2, hold=(1,),
+@builtin("cSolve", "cSolve(Equation,Var[=Guess])  |  cSolve(Eqn1 and Eqn2,{Var1,Var2})", 2, hold=(1,), complex=True,
          summary="Complex solutions of an equation or system")
 def csolve_(ctx, eq, var):
     return _solve(eq, var, complex_=True)
@@ -310,7 +310,7 @@ def zeros_(ctx, expr, var):
     return _zeros(expr, var, False)
 
 
-@builtin("cZeros", "cZeros(Expr,Var)", 2, hold=(1,), summary="List of complex zeros")
+@builtin("cZeros", "cZeros(Expr,Var)", 2, hold=(1,), complex=True, summary="List of complex zeros")
 def czeros_(ctx, expr, var):
     return _zeros(expr, var, True)
 
@@ -358,7 +358,7 @@ def factor_(ctx, expr, var=None):
     return sp.factor(expr)
 
 
-@builtin("cFactor", "cFactor(Expr[,Var])", 1, 2, hold=(1,), summary="Factor over the complex numbers")
+@builtin("cFactor", "cFactor(Expr[,Var])", 1, 2, hold=(1,), complex=True, summary="Factor over the complex numbers")
 def cfactor_(ctx, expr, var=None):
     if var is not None:
         symbol = _variables(var)[0][0]
@@ -410,7 +410,7 @@ def _single_var(var: Any) -> tuple[sp.Symbol, Any]:
     return variables[0]
 
 
-@builtin("derivative", "derivative(Expr,Var[,Order])", 2, 3, hold=(1,),
+@builtin("d", "d(Expr,Var[,Order])", 2, 3, aliases=("derivative",), hold=(1,),
          summary="Derivative d/dVar")
 def derivative_(ctx, expr, var, order=1):
     symbol, at = _single_var(var)
@@ -452,12 +452,35 @@ def nint_(ctx, expr, var, lower, upper):
     return _numeric_integral(expr, symbol, lower, upper)
 
 
-@builtin("nDeriv", "nDeriv(Expr,Var=Value[,H])  |  nDeriv(Expr,Var[,H])|Var=Value", 2, 3, hold=(1,), approx=True,
-         summary="Numeric derivative (central difference, H=0.001)")
-def nderiv_(ctx, expr, var, h=sp.Rational(1, 1000)):
+@builtin("centralDiff", "centralDiff(Expr1,Var[=Value][,Step])  |  centralDiff(Expr1,Var[,Step])|Var=Value",
+         2, 3, hold=(1,), approx=True, summary="Numeric derivative with the central difference quotient (Step=0.001)")
+def central_diff(ctx, expr, var, step=sp.Rational(1, 1000)):
     symbol, at = _single_var(var)
-    central = (expr.subs(symbol, symbol + h) - expr.subs(symbol, symbol - h)) / (2 * h)
+    steps = list(step) if isinstance(step, ListValue) else None
+    if steps is not None:
+        return ListValue(central_diff(ctx, expr, var, h) for h in steps)
+    central = (expr.subs(symbol, symbol + step) - expr.subs(symbol, symbol - step)) / (2 * step)
     return central.subs(symbol, at) if at is not None else central
+
+
+@builtin("avgRC", "avgRC(Expr1,Var[=Value][,Step])", 2, 3, hold=(1,),
+         summary="Forward-difference quotient (average rate of change), Step=0.001")
+def avg_rc(ctx, expr, var, step=sp.Rational(1, 1000)):
+    symbol, at = _single_var(var)
+    if isinstance(step, ListValue):
+        return ListValue(avg_rc(ctx, expr, var, h) for h in step)
+    quotient = (expr.subs(symbol, symbol + step) - expr) / step
+    return quotient.subs(symbol, at) if at is not None else quotient
+
+
+@builtin("nDerivative", "nDerivative(Expr1,Var=Value[,Order])  |  nDerivative(Expr1,Var[,Order])|Var=Value",
+         2, 3, aliases=("nDeriv",), hold=(1,), approx=True, summary="Numeric derivative (order 1 or 2)")
+def nderivative_(ctx, expr, var, order=1):
+    symbol, at = _single_var(var)
+    if int(order) not in (1, 2):
+        raise DomainError("Order must be 1 or 2")
+    result = sp.diff(expr, symbol, int(order))
+    return result.subs(symbol, at) if at is not None else result
 
 
 @builtin("limit", "limit(Expr,Var,Point[,Direction])", 3, 4, aliases=("lim",), hold=(1,),

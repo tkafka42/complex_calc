@@ -1,12 +1,12 @@
 import pytest
 import sympy as sp
 
-from complex_calc.core.errors import CalcSyntaxError
+from complex_calc.core.errors import CalcError, CalcSyntaxError
 
 
 def test_csolve_reference(calc):
     result = calc("cSolve(x^2+4x+13=0,x)")
-    assert set(result.split(" or ")) == {"x=-2+3·i", "x=-2-3·i"}
+    assert set(result.split(" or ")) == {"x=-2+3·ⅈ", "x=-2-3·ⅈ"}
 
 
 def test_solve_real_only(calc):
@@ -47,7 +47,7 @@ def test_nsolve(num):
 
 def test_zeros(calc):
     assert calc("zeros(x^3-x,x)") == "{-1,0,1}"
-    assert set(calc("cZeros(x^2+1,x)")[1:-1].split(",")) == {"-i", "i"}
+    assert set(calc("cZeros(x^2+1,x)")[1:-1].split(",")) == {"-ⅈ", "ⅈ"}
 
 
 def test_factor_expand(calc):
@@ -56,7 +56,7 @@ def test_factor_expand(calc):
     assert calc("factor(x^2-2,x)") == "(x-√(2))·(x+√(2))"
     assert calc("factor(360)") == "2^3·3^2·5"
     assert calc("expand((x+1)^3)") == "x^3+3·x^2+3·x+1"
-    assert calc("cFactor(x^2+1,x)") == "(x-i)·(x+i)"
+    assert calc("cFactor(x^2+1,x)") == "(x-ⅈ)·(x+ⅈ)"
 
 
 def test_approx_exact(calc):
@@ -67,10 +67,10 @@ def test_approx_exact(calc):
 
 
 def test_logs_and_exp(calc):
-    assert calc("ln(e)") == "1"
+    assert calc("ln(ℯ)") == "1"
     assert calc("log(8,2)") == "3"
     assert calc("log(1000)") == "3"
-    assert calc("e^(0)") == "1"
+    assert calc("ℯ^(0)") == "1"
     assert calc("ℯ^(ln(5))") == "5"
     assert calc("√(8)") == "2·√(2)"
     assert calc("sqrt(16)") == "4"
@@ -120,9 +120,12 @@ def test_calculus(calc, num):
     assert calc("derivative(x^3,x)") == "3·x^2"
     assert calc("∫(x^2,x,0,3)") == "9"
     assert calc("integral(x^2,x)") == "x^3/3"
-    assert num("nDeriv(x^3,x=2)") == pytest.approx(12.000001)
-    assert num("nDeriv(x^3,x)|x=2") == pytest.approx(12.000001)
-    assert num("nInt(e^(-x^2),x,-∞,∞)") == pytest.approx(3.14159265 ** 0.5)
+    assert num("centralDiff(x^3,x=2)") == pytest.approx(12.000001)
+    assert num("centralDiff(x^3,x)|x=2") == pytest.approx(12.000001)
+    assert num("nDerivative(x^3,x=2)") == pytest.approx(12)
+    assert num("nDerivative(x^3,x=2,2)") == pytest.approx(12)
+    assert num("avgRC(x^2,x=1)") == pytest.approx(2.001)
+    assert num("nInt(ℯ^(-x^2),x,-∞,∞)") == pytest.approx(3.14159265 ** 0.5)
     assert calc("limit(sin(x)/x,x,0)") == "1"
 
 
@@ -143,7 +146,7 @@ def test_misc(calc):
     assert calc("approx(3)") == "3."
 
 
-@pytest.mark.parametrize("source", ["2+", "sin x", "(1+2", "3 4", "solve(x^2=4", "#"])
+@pytest.mark.parametrize("source", ["2+", "(1+2", "3 4", "solve(x^2=4", "#"])
 def test_syntax_errors(session, source):
     with pytest.raises(CalcSyntaxError):
         session.evaluate(source)
@@ -154,3 +157,8 @@ def test_error_message_has_pointer(session):
     assert entry.error
     assert "Syntax error" in entry.text
     assert "^" in entry.text
+
+
+def test_missing_parenthesis(session):
+    with pytest.raises(CalcError):
+        session.evaluate("sin x")

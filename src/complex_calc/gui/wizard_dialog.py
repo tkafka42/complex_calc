@@ -41,11 +41,21 @@ class WizardDialog(QDialog):
         self.setWindowTitle(title)
         self.variant = variant
         self.edits: dict[str, QLineEdit] = {}
+        self.combos: dict[str, tuple[QComboBox, list[str]]] = {}
 
         outer = QVBoxLayout(self)
         form = QFormLayout()
         outer.addLayout(form)
         for field in variant.fields:
+            if field.choices:
+                combo = QComboBox()
+                combo.addItems([label for label, _ in field.choices])
+                values = [value for _, value in field.choices]
+                if field.default in values:
+                    combo.setCurrentIndex(values.index(field.default))
+                form.addRow(field.label, combo)
+                self.combos[field.key] = (combo, values)
+                continue
             edit = QLineEdit(field.default)
             edit.setMinimumWidth(260)
             if not field.enabled:
@@ -73,6 +83,8 @@ class WizardDialog(QDialog):
 
     def command(self) -> str:
         values = {key: edit.text() for key, edit in self.edits.items() if edit.isEnabled()}
+        for key, (combo, options) in self.combos.items():
+            values[key] = options[combo.currentIndex()]
         return self.variant.build(values)
 
 

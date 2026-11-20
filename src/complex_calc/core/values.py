@@ -61,6 +61,26 @@ class StatResults:
 
 @dataclass
 class TextValue:
-    """A plain string result (e.g. "Done")."""
+    """A plain text result: quoted ("m*x+b") or raw (Done, 0b101, 30°15'0″)."""
 
     text: str
+    quoted: bool = True
+
+
+class StringValue(str):
+    """A string such as "hello"."""
+
+
+@dataclass
+class UserProgram:
+    """Define name(params)=Func ... EndFunc  or  =Prgm ... EndPrgm."""
+
+    name: str
+    params: list[str]
+    block: list[Any]
+    kind: str  # "func" | "prgm"
+    source: str = ""
+
+
+def is_matrix(value: Any) -> bool:
+    return isinstance(value, sp.MatrixBase)

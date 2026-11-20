@@ -26,7 +26,8 @@ from ..functions.registry import REGISTRY
 from ..menus import MENU, MenuItem
 from .wizard_dialog import run_wizard
 
-SYMBOLS = ["√(", "π", "ℯ^(", "ⅈ", "∞", "^", "²", "≤", "≥", "≠", "→", "|", "°", "∫(", "x̄", "σ", "μ", "{", "}"]
+SYMBOLS = ["√(", "π", "ℯ^(", "ⅈ", "∞", "^", "²", "≤", "≥", "≠", "→", "|", "°", "∫(", "d(", "Σ(", "►", "∠",
+           "[", "]", "{", "}", "x̄", "σ", "μ", "θ"]
 
 
 class ClickableLabel(QLabel):
@@ -58,9 +59,18 @@ class HistoryItem(QFrame):
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(4)
 
-        source = ClickableLabel(entry.source, entry.source, "InputText")
+        first_line = entry.source.splitlines()[0] if entry.source else ""
+        shown = first_line + (" …" if "\n" in entry.source else "")
+        source = ClickableLabel(shown, entry.source, "InputText")
         source.clicked.connect(self.paste_requested)
         layout.addWidget(source, alignment=Qt.AlignLeft)
+
+        for line in entry.output:  # Disp / Text output of programs
+            out = QLabel(line)
+            out.setObjectName("TableLabel")
+            out.setTextFormat(Qt.PlainText)
+            out.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            layout.addWidget(out, alignment=Qt.AlignLeft)
 
         if entry.error:
             error = QLabel(entry.text)
@@ -209,18 +219,20 @@ class CalculatorPage(QWidget):
         self.scroll.setWidget(self.history_box)
         layout.addWidget(self.scroll, 1)
 
-        # symbol bar
-        symbols = QHBoxLayout()
-        symbols.setSpacing(4)
-        for symbol in SYMBOLS:
-            button = QPushButton(symbol)
-            button.setObjectName("Symbol")
-            button.setFocusPolicy(Qt.NoFocus)
-            button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-            button.clicked.connect(lambda checked=False, s=symbol: self.entry.insert_text(s))
-            symbols.addWidget(button)
-        symbols.addStretch(1)
-        layout.addLayout(symbols)
+        # symbol bar (two rows so the window stays narrow)
+        half = (len(SYMBOLS) + 1) // 2
+        for chunk in (SYMBOLS[:half], SYMBOLS[half:]):
+            symbols = QHBoxLayout()
+            symbols.setSpacing(4)
+            for symbol in chunk:
+                button = QPushButton(symbol)
+                button.setObjectName("Symbol")
+                button.setFocusPolicy(Qt.NoFocus)
+                button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+                button.clicked.connect(lambda checked=False, s=symbol: self.entry.insert_text(s))
+                symbols.addWidget(button)
+            symbols.addStretch(1)
+            layout.addLayout(symbols)
 
         # entry row
         row = QHBoxLayout()
@@ -249,6 +261,7 @@ class CalculatorPage(QWidget):
         layout.addLayout(row)
 
         self.menu = build_menu(self, MENU, self.on_menu_item)
+        self.session.input_provider = self.ask_input
         QShortcut(QKeySequence("Ctrl+M"), self, activated=self.open_menu)
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self.clear_history)
         self.entry.setFocus()
@@ -264,6 +277,8 @@ class CalculatorPage(QWidget):
     def submit(self, text: str, approximate: bool = False):
         entry = self.session.run(text, force_approx=approximate)
         self.add_history_item(entry)
+        if entry.drawing:
+            self.show_drawing(entry.drawing)
         if not entry.error:
             self.entry.clear()
         else:
@@ -288,6 +303,65 @@ class CalculatorPage(QWidget):
         top_left = self.menu_button.mapToGlobal(QPoint(0, 0))
         self.menu.popup(top_left - QPoint(0, self.menu.sizeHint().height()))
 
+    def show_drawing(self, ops):
+        """Graphics screen of a program (CX II Draw commands), 318×212 px."""
+        from PySide6.QtGui import QImage, QPixmap
+        from PySide6.QtWidgets import QDialog, QVBoxLayout as VBox
+
+        from ..functions.draw import render
+
+        image = render(ops, scale=2)
+        data = image.tobytes("raw", "RGB")
+        qimage = QImage(data, image.width, image.height, image.width * 3, QImage.Format_RGB888).copy()
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Graphics")
+        box = VBox(dialog)
+        label = QLabel()
+        label.setPixmap(QPixmap.fromImage(qimage))
+        box.addWidget(label)
+        hint = QLabel("Finished — press any key or close the window")
+        hint.setObjectName("Hint")
+        box.addWidget(hint)
+        dialog.keyPressEvent = lambda event: dialog.accept()
+        dialog.exec()
+
+    def open_program_editor(self, name: str = ""):
+        from .program_editor import ProgramEditor
+
+        editor = ProgramEditor(self.session, self, name)
+        if editor.exec():
+            self.add_history_item(self.session.history[-1])
+
+    def recall_definition(self):
+        from PySide6.QtWidgets import QInputDialog
+
+        from ..core.session import normalize_name
+        from ..core.values import UserFunction, UserProgram
+
+        name, ok = QInputDialog.getText(self, "Recall Definition", "Variable or function name:")
+        if not ok or not name.strip():
+            return
+        value = self.session.variables.get(normalize_name(name.strip()))
+        if isinstance(value, UserProgram):
+            self.open_program_editor(name.strip())
+        elif isinstance(value, UserFunction):
+            params = ",".join(p.name for p in value.params)
+            from ..core.formatting import format_expr
+
+            self.entry.setText(f"Define {name.strip()}({params})={format_expr(value.body, self.session.settings)}")
+        elif value is not None:
+            self.entry.setText(f"{name.strip()}:={self.session.format(value)}")
+
+    def ask_input(self, prompt: str, as_string):
+        """Input provider for Request / RequestStr / Text."""
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        if as_string is None:  # Text
+            QMessageBox.information(self, "Text", prompt)
+            return ""
+        text, ok = QInputDialog.getText(self, "Request", prompt)
+        return text if ok else None
+
     def on_menu_item(self, item: MenuItem):
         if item.wizard is not None:
             command = run_wizard(item.wizard, self)
@@ -297,8 +371,11 @@ class CalculatorPage(QWidget):
         if item.action == "clear_history":
             self.clear_history()
         elif item.action == "clear_az":
-            self.session.clear_variables()
-            self.add_history_item(Entry("Clear a-z", "Done"))
+            self.submit("ClearAZ")
+        elif item.action == "program_editor":
+            self.open_program_editor()
+        elif item.action == "recall_definition":
+            self.recall_definition()
         elif item.insert:
             self.entry.insert_text(item.insert)
         self.entry.setFocus()

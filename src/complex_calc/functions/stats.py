@@ -147,13 +147,17 @@ def binom_cdf(ctx, n, p, *bounds):
     return _num(sps.binom.cdf(upper_k, trials, prob) - sps.binom.cdf(lower_k - 1, trials, prob))
 
 
-@builtin("invBinom", "invBinom(CumulativeProb,NumTrials,Prob)", 3, approx=True,
+@builtin("invBinom", "invBinom(CumulativeProb,NumTrials,Prob[,OutputForm])", 3, 4, approx=True,
          summary="Smallest k with binomCdf(n,p,0,k) ≥ CumulativeProb")
-def inv_binom(ctx, cum, n, p):
+def inv_binom(ctx, cum, n, p, output_form=None):
     c = to_float(cum, "CumulativeProb")
     check_probability(c, "CumulativeProb")
     trials, prob = _binom_params(n, p)
-    return sp.Integer(int(sps.binom.ppf(c, trials, prob)))
+    k = int(sps.binom.ppf(c, trials, prob))
+    if output_form is not None and to_float(output_form, "OutputForm") == 1:
+        return sp.ImmutableMatrix([[k - 1, _num(sps.binom.cdf(k - 1, trials, prob))],
+                                   [k, _num(sps.binom.cdf(k, trials, prob))]])
+    return sp.Integer(k)
 
 
 # ------------------------------------------------------------- Poisson / geometric
@@ -311,11 +315,6 @@ def min_(ctx, a, b=None):
 def max_(ctx, a, b=None):
     data = to_list(a, "List") if b is None else [a, b]
     return sp.Max(*data)
-
-
-@builtin("dim", "dim(List)", 1, summary="Number of elements of a list")
-def dim_(ctx, values):
-    return sp.Integer(len(to_list(values, "List")))
 
 
 # Shared with intervals / OneVar

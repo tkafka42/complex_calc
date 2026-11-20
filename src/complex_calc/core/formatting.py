@@ -13,7 +13,7 @@ from typing import Any
 import sympy as sp
 from sympy.printing.str import StrPrinter
 
-from .values import ListValue, SolveResult, StatResults, TextValue, UserFunction
+from .values import ListValue, SolveResult, StatResults, StringValue, TextValue, UserFunction, UserProgram
 
 
 def display_width(text: str) -> int:
@@ -21,14 +21,38 @@ def display_width(text: str) -> int:
     return sum(1 for c in text if not unicodedata.combining(c))
 
 
-def format_float(value: float, digits: int = 6) -> str:
+def _spec(digits: Any) -> tuple[int, int | None, str, str]:
+    """digits may be an int (Float n) or a Settings object."""
+    if isinstance(digits, int):
+        return digits, None, "normal", "dec"
+    n = 12 if getattr(digits, "float_full", False) else getattr(digits, "digits", 6)
+    return n, getattr(digits, "fix", None), getattr(digits, "exp_format", "normal"), getattr(digits, "base", "dec")
+
+
+def format_float(value: float, digits: Any = 6) -> str:
+    n_digits, fix, exp_format, _ = _spec(digits)
     if value != value:  # NaN
         return "undef"
     if value in (float("inf"), float("-inf")):
         return "∞" if value > 0 else "-∞"
     if value == 0:
-        return "0."
-    text = f"{value:.{digits}g}"
+        return "0." if fix is None else f"{0:.{fix}f}"
+    magnitude = abs(value)
+    if exp_format in ("scientific", "engineering") or magnitude >= 1e12 or (fix is not None and magnitude < 10 ** -fix / 2 and magnitude > 0):
+        exponent = int(f"{value:e}".split("e")[1])
+        if exp_format == "engineering":
+            exponent = (exponent // 3) * 3
+        mantissa = value / 10**exponent
+        if fix is not None:
+            m_text = f"{mantissa:.{fix}f}"
+        else:
+            m_text = f"{mantissa:.{n_digits}g}"
+            if "." not in m_text:
+                m_text += "."
+        return f"{m_text}E{exponent}"
+    if fix is not None:
+        return f"{value:.{fix}f}"
+    text = f"{value:.{n_digits}g}"
     if "e" in text:
         mantissa, exponent = text.split("e")
         if "." not in mantissa:
@@ -40,18 +64,28 @@ def format_float(value: float, digits: int = 6) -> str:
 
 
 class CalcPrinter(StrPrinter):
-    def __init__(self, digits: int = 6):
+    def __init__(self, digits: Any = 6):
         super().__init__({"order": None})
         self.digits = digits
+        self.base = _spec(digits)[3]
+
+    def _print_Integer(self, expr):
+        if self.base == "hex":
+            n = int(expr) & ((1 << 64) - 1) if int(expr) < 0 else int(expr)
+            return "0h" + format(n, "X")
+        if self.base == "bin":
+            n = int(expr) & ((1 << 64) - 1) if int(expr) < 0 else int(expr)
+            return "0b" + format(n, "b")
+        return str(expr)
 
     def _print_Float(self, expr):
         return format_float(float(expr), self.digits)
 
     def _print_ImaginaryUnit(self, expr):
-        return "i"
+        return "ⅈ"
 
     def _print_Exp1(self, expr):
-        return "e"
+        return "ℯ"
 
     def _print_Pi(self, expr):
         return "π"
@@ -77,8 +111,8 @@ class CalcPrinter(StrPrinter):
     def _print_exp(self, expr):
         arg = self._print(expr.args[0])
         if re.fullmatch(r"[\w.]+", arg):
-            return f"e^{arg}"
-        return f"e^({arg})"
+            return f"ℯ^{arg}"
+        return f"ℯ^({arg})"
 
     def _print_log(self, expr):
         if len(expr.args) == 2:
@@ -122,6 +156,71 @@ class CalcPrinter(StrPrinter):
         arg = self._print(expr.args[0])
         return f"{arg}!" if re.fullmatch(r"\w+", arg) else f"({arg})!"
 
+    def _print_MatrixBase(self, expr):
+        return format_matrix(expr, self.digits)
+
+    _print_ImmutableDenseMatrix = _print_MatrixBase
+    _print_MutableDenseMatrix = _print_MatrixBase
+
+    def _print_Piecewise(self, expr):
+        parts = []
+        for value, cond in expr.args:
+            if cond is sp.true:
+                parts.append(self._print(value))
+            else:
+                parts.append(f"{self._print(value)},{self._print(cond)}")
+        return "piecewise(" + ",".join(parts) + ")"
+
+    def _print_sec(self, expr):
+        return f"sec({self._print(expr.args[0])})"
+
+    def _print_asec(self, expr):
+        return f"sec⁻¹({self._print(expr.args[0])})"
+
+    def _print_acsc(self, expr):
+        return f"csc⁻¹({self._print(expr.args[0])})"
+
+    def _print_acot(self, expr):
+        return f"cot⁻¹({self._print(expr.args[0])})"
+
+    def _print_asinh(self, expr):
+        return f"sinh⁻¹({self._print(expr.args[0])})"
+
+    def _print_acosh(self, expr):
+        return f"cosh⁻¹({self._print(expr.args[0])})"
+
+    def _print_atanh(self, expr):
+        return f"tanh⁻¹({self._print(expr.args[0])})"
+
+    def _print_floor(self, expr):
+        return f"floor({self._print(expr.args[0])})"
+
+    def _print_ceiling(self, expr):
+        return f"ceiling({self._print(expr.args[0])})"
+
+    def _print_Derivative(self, expr):
+        inner = self._print(expr.expr)
+        parts = []
+        for var, count in expr.variable_count:
+            parts.append((self._print(var), count))
+        var, count = parts[0]
+        return f"d({inner},{var})" if count == 1 else f"d({inner},{var},{count})"
+
+    def _print_Integral(self, expr):
+        inner = self._print(expr.function)
+        limits = expr.limits[0]
+        if len(limits) == 3:
+            return f"∫({inner},{self._print(limits[0])},{self._print(limits[1])},{self._print(limits[2])})"
+        return f"∫({inner},{self._print(limits[0])})"
+
+    def _print_Sum(self, expr):
+        var, lo, hi = expr.limits[0]
+        return f"Σ({self._print(expr.function)},{self._print(var)},{self._print(lo)},{self._print(hi)})"
+
+    def _print_Product(self, expr):
+        var, lo, hi = expr.limits[0]
+        return f"Π({self._print(expr.function)},{self._print(var)},{self._print(lo)},{self._print(hi)})"
+
     def _print_binomial(self, expr):
         return f"nCr({self._print(expr.args[0])},{self._print(expr.args[1])})"
 
@@ -133,7 +232,7 @@ def _tidy(text: str) -> str:
     return text
 
 
-def format_expr(expr: Any, digits: int = 6) -> str:
+def format_expr(expr: Any, digits: Any = 6) -> str:
     if isinstance(expr, bool):
         return "true" if expr else "false"
     if isinstance(expr, float):
@@ -158,7 +257,7 @@ def _format_interval(var: sp.Symbol, interval: sp.Interval, digits: int) -> str:
     return f"{lo_text}{left}{name}{right}{hi_text}"
 
 
-def format_solve_result(result: SolveResult, digits: int = 6) -> str:
+def format_solve_result(result: SolveResult, digits: Any = 6) -> str:
     if result.always_true:
         return "true"
     parts = [
@@ -172,7 +271,7 @@ def format_solve_result(result: SolveResult, digits: int = 6) -> str:
     return " or ".join(parts)
 
 
-def stat_table(results: StatResults, digits: int = 6) -> list[tuple[str, str]]:
+def stat_table(results: StatResults, digits: Any = 6) -> list[tuple[str, str]]:
     """Rows as shown in the handheld stat.results table (labels in quotes)."""
     rows = [('"Title"', f'"{results.title}"')]
     for label, value in results.rows:
@@ -180,11 +279,25 @@ def stat_table(results: StatResults, digits: int = 6) -> list[tuple[str, str]]:
     return rows
 
 
-def format_value(value: Any, digits: int = 6) -> str:
+def format_matrix(matrix: Any, digits: Any = 6) -> str:
+    rows = ["[" + ",".join(format_expr(matrix[r, c], digits) for c in range(matrix.cols)) + "]"
+            for r in range(matrix.rows)]
+    if matrix.rows == 1:
+        return rows[0]
+    return "[" + "".join(rows) + "]"
+
+
+def format_value(value: Any, digits: Any = 6) -> str:
     if value is None:
         return ""
     if isinstance(value, TextValue):
-        return f'"{value.text}"' if value.text not in ("Done",) else value.text
+        return f'"{value.text}"' if value.quoted else value.text
+    if isinstance(value, StringValue):
+        return f'"{value}"'
+    if isinstance(value, UserProgram):
+        return f"{value.name}({','.join(value.params)})  [{'Func' if value.kind == 'func' else 'Prgm'}]"
+    if isinstance(value, sp.MatrixBase):
+        return format_matrix(value, digits)
     if isinstance(value, ListValue):
         return "{" + ",".join(format_value(v, digits) for v in value) + "}"
     if isinstance(value, SolveResult):

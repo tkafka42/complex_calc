@@ -163,3 +163,134 @@ def remain_(ctx, a, b):
 @builtin("sign", "sign(Expr)", 1, listable=(0,), summary="Sign: -1, 0 or 1")
 def sign_(ctx, x):
     return sp.sign(x)
+
+
+# ------------------------------------------------------------------ more trig / hyperbolic
+
+
+def _trig(name: str, func, summary: str, aliases: tuple[str, ...] = ()):
+    @builtin(name, f"{name}(Expr)", 1, listable=(0,), aliases=aliases, summary=summary)
+    def wrapper(ctx, x):
+        return func(_to_radians(ctx, x))
+
+    return wrapper
+
+
+def _inverse(name: str, func, summary: str, aliases: tuple[str, ...]):
+    @builtin(name, f"{name}(Expr)", 1, listable=(0,), aliases=aliases, summary=summary)
+    def wrapper(ctx, x):
+        return _from_radians(ctx, func(x))
+
+    return wrapper
+
+
+def _plain(name: str, func, summary: str, aliases: tuple[str, ...] = ()):
+    @builtin(name, f"{name}(Expr)", 1, listable=(0,), aliases=aliases, summary=summary)
+    def wrapper(ctx, x):
+        return func(x)
+
+    return wrapper
+
+
+_trig("sec", sp.sec, "Secant")
+_trig("csc", sp.csc, "Cosecant")
+_trig("cot", sp.cot, "Cotangent")
+_inverse("sec⁻¹", sp.asec, "Inverse secant", ("arcsec",))
+_inverse("csc⁻¹", sp.acsc, "Inverse cosecant", ("arccsc",))
+_inverse("cot⁻¹", sp.acot, "Inverse cotangent", ("arccot",))
+_plain("sinh", sp.sinh, "Hyperbolic sine")
+_plain("cosh", sp.cosh, "Hyperbolic cosine")
+_plain("tanh", sp.tanh, "Hyperbolic tangent")
+_plain("sech", sp.sech, "Hyperbolic secant")
+_plain("csch", sp.csch, "Hyperbolic cosecant")
+_plain("coth", sp.coth, "Hyperbolic cotangent")
+_plain("sinh⁻¹", sp.asinh, "Inverse hyperbolic sine", ("arcsinh",))
+_plain("cosh⁻¹", sp.acosh, "Inverse hyperbolic cosine", ("arccosh",))
+_plain("tanh⁻¹", sp.atanh, "Inverse hyperbolic tangent", ("arctanh",))
+_plain("sech⁻¹", sp.asech, "Inverse hyperbolic secant", ("arcsech",))
+_plain("csch⁻¹", sp.acsch, "Inverse hyperbolic cosecant", ("arccsch",))
+_plain("coth⁻¹", sp.acoth, "Inverse hyperbolic cotangent", ("arccoth",))
+
+
+@builtin("exp", "exp(Expr)", 1, listable=(0,), matrix_aware=True, summary="ℯ raised to Expr")
+def exp_(ctx, x):
+    if hasattr(x, "is_square") and x.is_square:
+        return sp.ImmutableMatrix(x.exp())
+    return sp.exp(x)
+
+
+@builtin("int", "int(Expr)", 1, listable=(0,), summary="Greatest integer ≤ Expr (same as floor)")
+def int_(ctx, x):
+    return sp.floor(x)
+
+
+@builtin("intDiv", "intDiv(Number1,Number2)", 2, listable=ALL, summary="Signed integer part of Number1/Number2")
+def int_div(ctx, a, b):
+    if b == 0:
+        raise DomainError("Division by zero")
+    q = a / b
+    return sp.sign(q) * sp.floor(sp.Abs(q))
+
+
+@builtin("isPrime", "isPrime(Number)", 1, listable=(0,), summary="true if Number is a prime ≥ 2")
+def is_prime(ctx, n):
+    if not (isinstance(n, sp.Integer) or (n.is_number and float(n).is_integer())):
+        raise DomainError("isPrime needs a whole number")
+    return sp.true if sp.isprime(int(n)) else sp.false
+
+
+@builtin("angle", "angle(Expr)", 1, listable=(0,), summary="Polar angle of a complex number")
+def angle_(ctx, x):
+    return _from_radians(ctx, sp.arg(x))
+
+
+@builtin("approxRational", "approxRational(Expr[,Tol])", 1, 2, listable=(0,), exact=True,
+         summary="Fraction approximating Expr within Tol (default 5E-14)")
+def approx_rational(ctx, x, tol=None):
+    from .conversions import simplest_fraction
+
+    tolerance = float(tol) if tol is not None else 5e-14
+    return simplest_fraction(x, tolerance)
+
+
+@builtin("getNum", "getNum(Expr)", 1, listable=(0,), summary="Numerator after combining fractions")
+def get_num(ctx, x):
+    return sp.fraction(sp.cancel(sp.together(x)))[0]
+
+
+@builtin("getDenom", "getDenom(Expr)", 1, listable=(0,), summary="Denominator after combining fractions")
+def get_denom(ctx, x):
+    return sp.fraction(sp.cancel(sp.together(x)))[1]
+
+
+@builtin("comDenom", "comDenom(Expr[,Var])", 1, 2, hold=(1,), listable=(0,), summary="Common denominator form")
+def com_denom(ctx, x, var=None):
+    num, den = sp.fraction(sp.cancel(sp.together(x)))
+    return sp.Mul(sp.expand(num), sp.Pow(sp.expand(den), -1), evaluate=False) if den != 1 else sp.expand(num)
+
+
+@builtin("propFrac", "propFrac(Expr[,Var])", 1, 2, hold=(1,), listable=(0,), summary="Proper fraction expansion")
+def prop_frac(ctx, x, var=None):
+    if isinstance(x, sp.Rational) and not isinstance(x, sp.Integer):
+        whole = sp.sign(x) * (abs(x.p) // x.q)
+        rest = x - whole
+        return sp.Add(whole, rest, evaluate=False) if whole != 0 else rest
+    symbol = var if isinstance(var, sp.Symbol) else None
+    if symbol is None:
+        symbols = sorted(x.free_symbols, key=lambda s: s.name)
+        symbol = symbols[0] if symbols else None
+    if symbol is None:
+        return x
+    num, den = sp.fraction(sp.together(x))
+    quotient, remainder = sp.div(sp.Poly(num, symbol), sp.Poly(den, symbol))
+    return quotient.as_expr() + remainder.as_expr() / den
+
+
+@builtin("tExpand", "tExpand(Expr)", 1, listable=(0,), summary="Expand trig of sums/multiples")
+def t_expand(ctx, x):
+    return sp.expand_trig(x)
+
+
+@builtin("tCollect", "tCollect(Expr)", 1, listable=(0,), summary="Collect trig products/powers into multiple angles")
+def t_collect(ctx, x):
+    return sp.simplify(sp.fu(x, measure=lambda e: e.count_ops()))

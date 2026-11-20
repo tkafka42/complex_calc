@@ -1,98 +1,117 @@
 # Unsure syntax / behaviour — please verify on a real device
 
-Everything below was implemented from memory of the official reference guide
-and the handheld menus, **not** from the device itself. Items here may differ
-from the real handheld. If you check one, update the code and remove the entry.
+## What is verified
 
-Legend: **[menu]** menu numbering, **[syntax]** command syntax/argument order,
-**[output]** display format, **[dev]** deliberate deviation of this app.
-
-## Output format
-
-- **[output]** `zInterval` / `tInterval` table: the first row is shown as
-  `"Title" "z Interval"`, then a combined row `"CLower, CUpper" {lo,hi}`, then
-  `"x̄"`, `"ME"`, (`"sx"` data input only), `"n"`, `"σ"` (z) or
-  `"df"`, `"sx"`, `"n"` (t). Not sure whether the device shows CLower/CUpper as
-  one combined row or as two rows.
-- **[output]** Default display is Float 6, and an approximate integer is shown
-  with a trailing dot (`3.`). Very small/large numbers are shown as `1.2E-5`.
-  The exact switch point to scientific notation may differ.
-- **[output]** Order of solutions: `cSolve(x^2+4x+13=0,x)` shows
-  `x=-2-3·i or x=-2+3·i`. The device may list `+` first.
-- **[output]** Periodic solutions: `solve(sin(x)=0,x)` gives
-  `x=2·π·n1 or x=2·π·n1+π`. The device simplifies this to `x=n1·π`.
-- **[output]** Inequalities: `solve(x^2≤4,x)` shows `-2≤x≤2`. The device may
-  show `x≥-2 and x≤2`.
-- **[output]** `log(2)` (exact) is shown as `ln(2)/ln(10)`, not as `log₁₀(2)`.
-- **[output]** Distribution functions (`normCdf`, `binomPdf`, …) always return
-  decimals, even in Exact mode.
-- **[output]** `LinRegMx` table rows: `RegEqn "m*x+b"`, `m`, `b`, `r²`, `r`,
-  `Resid`. `QuadReg` uses capital `R²`. `ExpReg` shows `RegEqn "a*(b)^x"`.
-- **[output]** `ExpReg`: `r²`/`r` are computed for the linearised data
-  (ln y vs x). `Resid` uses the original y values. The device might use the
-  linearised residuals.
-- **[output]** `SinReg`: the amplitude `a` is made positive and `c` is reduced
-  to (-π, π]. The device may return an equivalent but different `a`/`c` pair.
-  `Iterations` is accepted but ignored (the fit always runs to convergence).
-- **[output]** `OneVar` row labels (`"sx := sn-1x"`, `"σx := σnx"`, `"Q₁X"`,
-  `"SSX := Σ(x-x̄)²"`).
-
-## Syntax
-
-- **[syntax]** `factor(expr, var)` also splits off irrational real factors:
-  `factor(x^2-2,x)` → `(x-√(2))·(x+√(2))`, while `factor(x^2-2)` stays
-  `x^2-2`. This is believed to match the device.
-- **[syntax]** `invNorm(Area[,μ[,σ]])`: newer OS versions may also take a
-  *Tail* argument (Left/Center/Right). It is not implemented here.
-- **[syntax]** `zInterval`/`tInterval`: a CLevel above 1 (e.g. `95`) is read
-  as a percentage. The device may reject it.
-- **[syntax]** Derivative: on the handheld it is a template (`d/dx`). Here you
-  type `derivative(Expr,Var[,Order])`. Integral: `∫(` or `integral(`.
-- **[syntax]** `nDeriv(Expr,Var=Value[,H])` uses the central difference with
-  H = 0.001 by default.
-- **[syntax]** Inverse trig functions: `sin⁻¹(`, also `arcsin(` / `asin(`.
-
-## Deliberate deviations [dev]
-
-- On the handheld, `e` and `i` typed as letters are ordinary variables, and
-  Euler's number/the imaginary unit are the special keys `ℯ` and `ⅈ`. Here
-  `e` and `i` **are** Euler's number and the imaginary unit (easier on a PC
-  keyboard). `ℯ`, `ⅈ` and `@i` work too.
-- An undefined name followed by `(` is implicit multiplication (`a(x+1)` =
-  `a·(x+1)`). On the handheld it may be treated as a call to an undefined
-  function.
-- `x:=5` shows `5`, `Define x=5` shows `Done`, `Define f(x)=…` shows `Done`.
-- Error messages are written by this app and do not copy the handheld texts.
+- **Command names, argument order and optional arguments** follow the official
+  *TI-Nspire™ CX CAS Reference Guide* (v6.4). All commands in its alphabetical
+  listing are implemented except those listed under "Not implemented" below.
+- **Keyboard shortcuts** (`@e`, `@i`, `@>`, `@t`, `=>`, `<=>`, `=:`,
+  `derivative(`, `integral(`, `sumSeq(`, `deltaList(` …) and the **order of
+  evaluation (EOS™)** follow the guide's chapters "Shortcuts for Entering Math
+  Expressions" and "EOS Hierarchy". This includes:
+  - `a(b+c)` is a function call. Write `a*(b+c)` to multiply. If `a` already
+    holds a value, it is a multiplication.
+  - The letters `e` and `i` are ordinary variables. Euler's number is `ℯ` or
+    `@e`, the imaginary unit is `ⅈ` or `@i`. The setting "Typed e and i are
+    constants" switches this off (this is not available on the handheld).
+  - In Real mode (the default), `√(-4)` gives "Non-real result".
+- **stat.* output variables** of all statistics commands follow the guide.
+- **Submenu order** of *Distributions*, *Confidence Intervals*, *Stat Tests*
+  and *Stat Calculations* follows the official TI-Nspire eGuide.
+  `Menu → 5 Probability → 5 Distributions → 2 Normal Cdf` (and `3` Inverse
+  Normal) is confirmed by official TI teacher notes.
 
 ## Menu numbering [menu]
 
-Paths marked `[?]` in `:menu` (REPL) or with "?" in the GUI. Main uncertain
-areas:
+Menu items marked `[?]` (REPL `:menu`) or `(?)` (GUI) are reconstructed from
+memory:
 
-- Menu 1 *Actions* items 2–8.
-- Menu 2 *Number*: complete numbering, *Number Tools* and
-  *Complex Number Tools* submenus.
-- Menu 3 *Algebra*: items 5–C (Complete the Square, Numerical Solve, Solve
-  System, Polynomial Tools, Fraction Tools, Convert Expression, Trigonometry,
-  Complex). Inside *Complex*: 1 Solve, 2 Factor, 3 Zeros.
-- Menu 4 *Calculus*: items 2 and 5–F, and *Numerical Calculations*
-  (1 Numerical Derivative at a Point, 2 Numerical Integral).
-- Distributions (Menu 5 → 5 and Menu 6 → 5): items 1–C are believed correct.
-  The letters **D–K** (Binomial Pdf = D, Binomial Cdf = E, Inverse Binomial = F,
-  Inverse Binomial w.r.t. N = G, Poisson Pdf = H, Poisson Cdf = I,
-  Geometric Pdf = J, Geometric Cdf = K) are unsure, because OS versions added
-  entries over time.
+- The top-level menus 1–9 (Actions, Number, Algebra, Calculus, Probability,
+  Statistics, Matrix & Vector, Finance, Functions & Programs) are believed
+  correct.
+- Unsure are:
+  - all items of *Actions*, *Number*, *Matrix & Vector*, *Finance*,
+    *Functions & Programs*
+  - *Algebra* items 5 and above
+  - *Calculus* items 2 and 5 and above
+  - *Probability → Random*
+  - *Statistics → Stat Results / List Math / List Operations*
+- **Changed in this version:** the earlier letters for the distributions were
+  wrong. According to the eGuide, the order is:
 
-Paths believed correct: `6 → 5 → 2` Normal Cdf, `6 → 6 → 1` z Interval,
-`6 → 6 → 2` t Interval, `6 → 1 → 3` Linear Regression (mx+b),
-`6 → 1 → 6` Quadratic, `6 → 1 → A` Exponential, `6 → 1 → C` Sinusoidal,
-`6 → 3 → …` List Math, `3 → 1/2/3/4` Solve/Factor/Expand/Zeros.
+  | Key | Item | Key | Item |
+  |---|---|---|---|
+  | 9 | F Pdf | E | Inverse Binomial w.r.t. N |
+  | A | F Cdf | F | Poisson Pdf |
+  | B | Binomial Pdf | G | Poisson Cdf |
+  | C | Binomial Cdf | H | Geometric Pdf |
+  | D | Inverse Binomial | I | Geometric Cdf |
 
-## Wizard fields
+  The eGuide lists neither Inverse χ² nor Inverse F in this menu.
 
-Field labels and their order come from memory, e.g. *Normal Cdf*: Lower Bound,
-Upper Bound, μ, σ. *Binomial Cdf*: Num Trials n, Prob Success p, Lower Bound,
-Upper Bound. *z Interval (Stats)*: σ, x̄, n, C Level. *t Interval (Stats)*:
-x̄, sx, n, C Level. Regressions: X List, Y List, Save RegEqn to,
-Frequency List, Category List, Include Categories. Category fields are shown
-but disabled. Default values (e.g. -∞/∞ for the bounds) may differ.
+## Wizard fields [wizard]
+
+- The eGuide shows the *Normal Pdf* dialog (Lists & Spreadsheet) with the
+  fields "X Value", "Mean", "Standard Deviation" and a "Draw" check box. This
+  app uses "X Value", "μ", "σ", the way the Calculator dialog is remembered.
+  Please check which labels your handheld shows.
+- The regression dialogs use "X List", "Y List", "Save RegEqn To" (from the
+  eGuide), then "Frequency List", "Category List" and "Include Categories".
+- The Stat Test and Interval dialog labels (e.g. "μ0", "σ", "x̄", "n",
+  "Alternate Hyp", "C Level", "Pooled") are not documented in the eGuide.
+- The "Draw"/"Shade Area" check boxes are not implemented.
+
+## Output format [output]
+
+- **Result tables:** shown as `"Title" "z Interval"`, then
+  `"CLower, CUpper" {lo,hi}` and the other stat variables. Stat Tests also
+  show an `"Alternate Hyp"` row. The exact labels in the table are not given in
+  the guide.
+- **Number display:** Float 6 by default, and an approximate integer keeps its
+  dot (`3.`). The switch point to scientific notation may differ.
+- **Matrices** are shown as `[[1,2][3,4]]` and row vectors as `[1,2,3]`.
+- **Complex solutions:** order such as `x=-2-3·ⅈ or x=-2+3·ⅈ` may differ.
+- **Periodic solutions** are shown as `x=2·π·n1+π/6 or x=2·π·n1+5·π/6`. The
+  device may combine them.
+- **Inequalities** are shown as `-2≤x≤2`. The device may write
+  `x≥-2 and x≤2`.
+- **Exact `log(2)`** is shown as `ln(2)/ln(10)`, not `log₁₀(2)`.
+- **Distribution functions** always return decimals.
+- **`piecewise`/`when`** results are shown as `piecewise(…)`.
+- **`propFrac(7/3)`** is shown as `1/3+2` (the value is correct, the term
+  order is not).
+- **`SinReg`:** a > 0 and c in (-π,π]. `Iterations` is ignored.
+- **`ExpReg`/`PowerReg`:** r² and r refer to the linearised data.
+- **`sin(Matrix)`, `ln(Matrix)` …** work element by element here. On the
+  device they are matrix functions (`exp(Matrix)` is a real matrix
+  exponential).
+
+## Behaviour [dev]
+
+- **`invBinomN`:** implemented as the smallest N with
+  `binomCdf(N,p,0,NumSuccess) ≤ CumulativeProb`. Please check against the
+  netball example in the guide.
+- **`fMax`/`fMin`** return the global extremum candidates. For more
+  complicated functions the device may return other forms.
+- **`domain`, `dominantTerm`, `impDif`, `deSolve`** use SymPy. The output
+  form can differ, for example `y=c1·sin(x)+c2·cos(x)`.
+- **Draw commands:**
+  - dotted/dashed pens are drawn solid
+  - `UseBuffer`/`PaintBuffer` have no effect, because the drawing is shown
+    after the program ends
+  - `getKey()` always returns `""`
+- **`Wait`** really pauses (max. 100 s).
+- **Error messages** are this app's own wording. Error codes for `errCode`
+  are approximate.
+
+## Not implemented
+
+- `Define LibPub`/`LibPriv`: the syntax is accepted, but there is no library
+  system and no `libShortcut()`.
+- `RefreshProbeVars` (Vernier sensors).
+- Hub commands (`Send`, `Get`, `GetStr`, `eval`).
+- The Unit System setting (SI/Eng-US), Vector Format display, and the
+  remaining entries of the units catalog. Common units and all constants from
+  the guide are there.
+- Graphs, Geometry, Lists & Spreadsheet, Data & Statistics, Notes and Python
+  apps. Graphs and Lists are planned as milestones M4/M5.
