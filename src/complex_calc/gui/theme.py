@@ -49,7 +49,13 @@ DARK = Palette(
 )
 
 
+_active: Palette | None = None
+
+
 def current_palette() -> Palette:
+    """The palette of the last applied stylesheet (or the system's light/dark scheme)."""
+    if _active is not None:
+        return _active
     hints = QGuiApplication.styleHints()
     try:
         if hints.colorScheme() == Qt.ColorScheme.Dark:
@@ -60,6 +66,8 @@ def current_palette() -> Palette:
 
 
 def stylesheet(p: Palette) -> str:
+    global _active
+    _active = p
     return f"""
     QMainWindow, QDialog, QWidget#Page {{ background: {p.background}; color: {p.text}; }}
     QWidget {{ color: {p.text}; font-size: 11pt; }}
@@ -73,10 +81,14 @@ def stylesheet(p: Palette) -> str:
     }}
     QTabBar::tab:selected {{ color: {p.text}; border-bottom: 2px solid {p.accent}; }}
     QScrollArea {{ border: none; background: {p.background}; }}
-    QScrollArea > QWidget > QWidget {{ background: {p.background}; }}
+    QScrollArea > QWidget > QWidget#HistoryBox {{ background: {p.surface}; }}
     QFrame#HistoryItem {{
-        background: {p.surface}; border: 1px solid {p.border}; border-radius: 10px;
+        background: transparent; border: none; border-bottom: 1px solid {p.border};
     }}
+    QWidget#HistoryBox {{ background: {p.surface}; border: 1px solid {p.border}; border-radius: 10px; }}
+    QLabel#HelpLine {{ color: {p.muted}; font-family: monospace; font-size: 9.5pt; padding: 0 4px; }}
+    QLabel#Bracket {{ color: {p.result}; }}
+    QTabBar::tab:first {{ margin-left: 8px; }}
     QLabel#InputText {{ color: {p.text}; font-family: monospace; }}
     QLabel#ResultText {{ color: {p.result}; font-family: monospace; font-weight: 600; }}
     QLabel#ErrorText {{ color: {p.error}; font-family: monospace; }}
@@ -101,7 +113,7 @@ def stylesheet(p: Palette) -> str:
     QPushButton#Primary {{
         background: {p.accent}; color: {p.accent_text}; border: none; font-weight: 700; padding: 7px 16px;
     }}
-    QPushButton#Symbol {{ font-family: monospace; font-size: 12pt; padding: 4px 6px; }}
+    QPushButton#Symbol {{ font-size: 11pt; padding: 3px 2px; min-width: 22px; }}
     QMenu {{ background: {p.surface}; border: 1px solid {p.border}; padding: 4px; }}
     QMenu::item {{ padding: 5px 24px 5px 12px; border-radius: 4px; }}
     QMenu::item:selected {{ background: {p.accent}; color: {p.accent_text}; }}
@@ -109,5 +121,13 @@ def stylesheet(p: Palette) -> str:
     QStatusBar {{ background: {p.surface}; color: {p.muted}; border-top: 1px solid {p.border}; }}
     QStatusBar QPushButton {{ background: transparent; border: none; color: {p.muted}; font-weight: 600; }}
     QStatusBar QPushButton:hover {{ color: {p.accent}; }}
+    QListWidget, QTableWidget, QPlainTextEdit {{
+        background: {p.surface}; color: {p.text}; border: 1px solid {p.border}; border-radius: 6px;
+        gridline-color: {p.border}; selection-background-color: {p.accent}; selection-color: {p.accent_text};
+    }}
+    QHeaderView::section {{ background: {p.surface_alt}; color: {p.muted}; border: none;
+        border-right: 1px solid {p.border}; border-bottom: 1px solid {p.border}; padding: 3px 6px; }}
+    QTableCornerButton::section {{ background: {p.surface_alt}; border: none; }}
+    QDialog {{ background: {p.background}; }}
     QComboBox {{ background: {p.surface}; border: 1px solid {p.border}; border-radius: 6px; padding: 4px 8px; }}
     """

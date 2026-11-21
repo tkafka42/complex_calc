@@ -49,6 +49,15 @@ memory:
 
   The eGuide lists neither Inverse χ² nor Inverse F in this menu.
 
+## German user interface [i18n]
+
+- The German menu and dialog labels were translated for this app. They have
+  not been compared with a German handheld OS, so the wording on your device
+  may differ (e.g. "Statistische Berechnungen", "Verteilungen").
+- The numbers in the menus are the same in both languages.
+- Detailed error texts are only in English. The error kind ("Syntaxfehler" …)
+  is translated.
+
 ## Wizard fields [wizard]
 
 - The eGuide shows the *Normal Pdf* dialog (Lists & Spreadsheet) with the

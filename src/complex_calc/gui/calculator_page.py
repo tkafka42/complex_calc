@@ -20,14 +20,18 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.formatting import stat_table
+from ..core.latex import input_latex, value_latex
 from ..core.session import Entry, Session
-from ..core.values import StatResults
+from ..core.values import StatResults, is_matrix
 from ..functions.registry import REGISTRY
+from ..i18n import tr, tr_error
 from ..menus import MENU, MenuItem
+from .mathview import MathLabel
+from .theme import current_palette
 from .wizard_dialog import run_wizard
 
-SYMBOLS = ["√(", "π", "ℯ^(", "ⅈ", "∞", "^", "²", "≤", "≥", "≠", "→", "|", "°", "∫(", "d(", "Σ(", "►", "∠",
-           "[", "]", "{", "}", "x̄", "σ", "μ", "θ"]
+SYMBOLS = ["π", "ℯ", "ⅈ", "∞", "√(", "^", "²", "≤", "≥", "≠", "→", "|", "°", "∠", "►",
+           "[", "]", "{", "}", "θ", "x̄", "σ", "μ", "λ", "χ²"]
 
 
 class ClickableLabel(QLabel):
@@ -40,12 +44,42 @@ class ClickableLabel(QLabel):
         self.setTextFormat(Qt.PlainText)
         self.setCursor(Qt.PointingHandCursor)
         self.setTextInteractionFlags(Qt.NoTextInteraction)
-        self.setToolTip("Click to paste into the entry line")
+        self.setToolTip(tr("Click to paste into the entry line"))
 
     def mousePressEvent(self, event):  # noqa: N802 (Qt naming)
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.payload)
         super().mousePressEvent(event)
+
+
+def _matrix_widget(matrix, session: Session, color: str, on_click) -> QWidget:
+    """A matrix shown as a grid between brackets."""
+    box = QWidget()
+    outer = QHBoxLayout(box)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.setSpacing(2)
+    left, right = QLabel("["), QLabel("]")
+    for bracket in (left, right):
+        bracket.setObjectName("Bracket")
+    grid_box = QWidget()
+    grid = QGridLayout(grid_box)
+    grid.setContentsMargins(4, 0, 4, 0)
+    grid.setHorizontalSpacing(14)
+    grid.setVerticalSpacing(2)
+    for r in range(matrix.rows):
+        for c in range(matrix.cols):
+            cell = matrix[r, c]
+            label = MathLabel(value_latex(cell, session.settings), session.format(cell), session.format(cell),
+                              color, "ResultText")
+            label.clicked.connect(on_click)
+            grid.addWidget(label, r, c, alignment=Qt.AlignCenter)
+    size = int(14 + 15 * matrix.rows)
+    for bracket in (left, right):
+        bracket.setStyleSheet(f"font-size: {size}px; font-weight: 200;")
+    outer.addWidget(left)
+    outer.addWidget(grid_box)
+    outer.addWidget(right)
+    return box
 
 
 class HistoryItem(QFrame):
@@ -55,13 +89,15 @@ class HistoryItem(QFrame):
         super().__init__()
         self.setObjectName("HistoryItem")
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        palette = current_palette()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(4)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(2)
 
         first_line = entry.source.splitlines()[0] if entry.source else ""
         shown = first_line + (" …" if "\n" in entry.source else "")
-        source = ClickableLabel(shown, entry.source, "InputText")
+        source = MathLabel(input_latex(entry.source, session), shown, entry.source, palette.text, "InputText",
+                           tooltip=entry.source)
         source.clicked.connect(self.paste_requested)
         layout.addWidget(source, alignment=Qt.AlignLeft)
 
@@ -73,15 +109,20 @@ class HistoryItem(QFrame):
             layout.addWidget(out, alignment=Qt.AlignLeft)
 
         if entry.error:
-            error = QLabel(entry.text)
+            error = QLabel(tr_error(entry.text))
             error.setObjectName("ErrorText")
             error.setTextFormat(Qt.PlainText)
             error.setTextInteractionFlags(Qt.TextSelectableByMouse)
             layout.addWidget(error, alignment=Qt.AlignRight)
         elif isinstance(entry.value, StatResults):
             layout.addWidget(self._table(entry.value, session), alignment=Qt.AlignRight)
+        elif is_matrix(entry.value):
+            layout.addWidget(_matrix_widget(entry.value, session, palette.result,
+                                            lambda _=None: self.paste_requested.emit(entry.text)),
+                             alignment=Qt.AlignRight)
         else:
-            result = ClickableLabel(entry.text, entry.text, "ResultText")
+            result = MathLabel(value_latex(entry.value, session.settings), entry.text, entry.text, palette.result,
+                               "ResultText", size=13.5)
             result.clicked.connect(self.paste_requested)
             layout.addWidget(result, alignment=Qt.AlignRight)
 
@@ -91,7 +132,7 @@ class HistoryItem(QFrame):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(18)
         grid.setVerticalSpacing(2)
-        for row, (label, value) in enumerate(stat_table(results, session.settings.digits)):
+        for row, (label, value) in enumerate(stat_table(results, session.settings)):
             name = QLabel(label)
             name.setTextFormat(Qt.PlainText)
             name.setObjectName("TableLabel")
@@ -110,7 +151,7 @@ class EntryLine(QLineEdit):
 
     def __init__(self):
         super().__init__()
-        self.setPlaceholderText("Enter an expression, e.g. normCdf(-∞,520,500,10)   (Ctrl+M: menu)")
+        self.setPlaceholderText(tr("Enter an expression (Ctrl+M: menu, Ctrl+K: catalog)"))
         self.recall: list[str] = []
         self.recall_index = 0
         names = sorted({spec.name for spec in REGISTRY.values()} | {"Define", "DelVar", "CopyVar"}, key=str.lower)
@@ -176,12 +217,37 @@ class EntryLine(QLineEdit):
         self.insert(text)
         self.setFocus()
 
+    def insert_template(self, text: str, offset: int):
+        position = self.cursorPosition()
+        self.insert(text)
+        self.setCursorPosition(position + offset)
+        self.setFocus()
+
+    def current_function(self) -> str | None:
+        """Name of the function whose parentheses contain the cursor (for the syntax help)."""
+        text = self.text()[: self.cursorPosition()]
+        depth = 0
+        for k in range(len(text) - 1, -1, -1):
+            ch = text[k]
+            if ch == ")":
+                depth += 1
+            elif ch == "(":
+                if depth == 0:
+                    end = k
+                    start = end
+                    while start > 0 and (text[start - 1].isalnum() or text[start - 1] in "_.²⁻¹χΔΣΠ√∫►"):
+                        start -= 1
+                    return text[start:end] or None
+                depth -= 1
+        words = text.split()
+        return words[0] if words else None
+
 
 def build_menu(parent: QWidget, items: list[MenuItem], on_select) -> QMenu:
     """Build a QMenu whose keys 1–9/A–K work as mnemonics, like on a handheld."""
     menu = QMenu(parent)
     for item in items:
-        label = f"&{item.key}: {item.label.replace('&', '&&')}"
+        label = f"&{item.key}: {tr(item.label).replace('&', '&&')}"
         if item.unsure:
             label += "  (?)"
         if item.children:
@@ -213,59 +279,99 @@ class CalculatorPage(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.history_box = QWidget()
+        self.history_box.setObjectName("HistoryBox")
         self.history_layout = QVBoxLayout(self.history_box)
-        self.history_layout.setSpacing(8)
+        self.history_layout.setSpacing(0)
         self.history_layout.addStretch(1)
         self.scroll.setWidget(self.history_box)
         layout.addWidget(self.scroll, 1)
 
-        # symbol bar (two rows so the window stays narrow)
-        half = (len(SYMBOLS) + 1) // 2
-        for chunk in (SYMBOLS[:half], SYMBOLS[half:]):
-            symbols = QHBoxLayout()
-            symbols.setSpacing(4)
-            for symbol in chunk:
-                button = QPushButton(symbol)
-                button.setObjectName("Symbol")
-                button.setFocusPolicy(Qt.NoFocus)
-                button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-                button.clicked.connect(lambda checked=False, s=symbol: self.entry.insert_text(s))
-                symbols.addWidget(button)
-            symbols.addStretch(1)
-            layout.addLayout(symbols)
+        # symbol bar
+        symbols = QHBoxLayout()
+        symbols.setSpacing(3)
+        for symbol in SYMBOLS:
+            button = QPushButton(symbol)
+            button.setObjectName("Symbol")
+            button.setFocusPolicy(Qt.NoFocus)
+            button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+            button.clicked.connect(lambda checked=False, s=symbol: self.entry.insert_text(s))
+            symbols.addWidget(button)
+        symbols.addStretch(1)
+        layout.addLayout(symbols)
 
         # entry row
         row = QHBoxLayout()
-        self.menu_button = QPushButton("Menu")
+        self.menu_button = QPushButton(tr("Menu"))
         self.menu_button.setObjectName("Primary")
-        self.menu_button.setToolTip("Numbered command menu (Ctrl+M)")
+        self.menu_button.setToolTip(tr("Numbered command menu (Ctrl+M)"))
         self.menu_button.setFocusPolicy(Qt.NoFocus)
         self.menu_button.clicked.connect(self.open_menu)
         row.addWidget(self.menu_button)
 
+        self.template_button = QPushButton("□/□")
+        self.template_button.setToolTip(tr("Templates") + " (Ctrl+T)")
+        self.template_button.setFocusPolicy(Qt.NoFocus)
+        self.template_button.clicked.connect(self.open_templates)
+        row.addWidget(self.template_button)
+
+        self.catalog_button = QPushButton("📖")
+        self.catalog_button.setToolTip(tr("Catalog") + " (Ctrl+K)")
+        self.catalog_button.setFocusPolicy(Qt.NoFocus)
+        self.catalog_button.clicked.connect(self.open_catalog)
+        row.addWidget(self.catalog_button)
+
         self.entry = EntryLine()
         self.entry.submitted.connect(self.submit)
+        self.entry.cursorPositionChanged.connect(self.update_help)
+        self.entry.textChanged.connect(self.update_help)
         row.addWidget(self.entry, 1)
 
         approx_button = QPushButton("≈")
-        approx_button.setToolTip("Evaluate approximately (Ctrl+Enter)")
+        approx_button.setToolTip(tr("Evaluate approximately (Ctrl+Enter)"))
         approx_button.setFocusPolicy(Qt.NoFocus)
         approx_button.clicked.connect(lambda: self._submit_from_button(True))
         row.addWidget(approx_button)
 
-        enter_button = QPushButton("Enter")
+        enter_button = QPushButton(tr("Enter"))
         enter_button.setObjectName("Primary")
         enter_button.setFocusPolicy(Qt.NoFocus)
         enter_button.clicked.connect(lambda: self._submit_from_button(False))
         row.addWidget(enter_button)
         layout.addLayout(row)
 
+        self.help_line = QLabel(" ")
+        self.help_line.setObjectName("HelpLine")
+        self.help_line.setTextFormat(Qt.PlainText)
+        layout.addWidget(self.help_line)
+
         self.menu = build_menu(self, MENU, self.on_menu_item)
         self.session.input_provider = self.ask_input
-        for keys, slot in (("Ctrl+M", self.open_menu), ("Ctrl+L", self.clear_history)):
+        for keys, slot in (("Ctrl+M", self.open_menu), ("Ctrl+L", self.clear_history),
+                           ("Ctrl+K", self.open_catalog), ("Ctrl+T", self.open_templates)):
             shortcut = QShortcut(QKeySequence(keys), self, activated=slot)
             shortcut.setContext(Qt.WidgetWithChildrenShortcut)
         self.entry.setFocus()
+
+    # ------------------------------------------------------------ catalog, templates, help
+    def open_catalog(self):
+        from .catalog import CatalogDialog
+
+        dialog = CatalogDialog(self)
+        dialog.inserted.connect(self.entry.insert_text)
+        dialog.exec()
+
+    def open_templates(self):
+        from .catalog import TemplatePalette
+
+        palette = TemplatePalette(self)
+        palette.chosen.connect(self.entry.insert_template)
+        palette.move(self.template_button.mapToGlobal(QPoint(0, -palette.sizeHint().height() - 4)))
+        palette.show()
+
+    def update_help(self, *_):
+        name = self.entry.current_function()
+        spec = REGISTRY.get(name.lower()) if name else None
+        self.help_line.setText(f"{spec.signature}   —   {spec.summary}" if spec else " ")
 
     # ------------------------------------------------------------ actions
     def _submit_from_button(self, approximate: bool):
@@ -315,12 +421,12 @@ class CalculatorPage(QWidget):
         data = image.tobytes("raw", "RGB")
         qimage = QImage(data, image.width, image.height, image.width * 3, QImage.Format_RGB888).copy()
         dialog = QDialog(self)
-        dialog.setWindowTitle("Graphics")
+        dialog.setWindowTitle(tr("Graphics"))
         box = VBox(dialog)
         label = QLabel()
         label.setPixmap(QPixmap.fromImage(qimage))
         box.addWidget(label)
-        hint = QLabel("Finished — press any key or close the window")
+        hint = QLabel(tr("Finished — press any key or close the window"))
         hint.setObjectName("Hint")
         box.addWidget(hint)
         dialog.keyPressEvent = lambda event: dialog.accept()
@@ -339,7 +445,7 @@ class CalculatorPage(QWidget):
         from ..core.session import normalize_name
         from ..core.values import UserFunction, UserProgram
 
-        name, ok = QInputDialog.getText(self, "Recall Definition", "Variable or function name:")
+        name, ok = QInputDialog.getText(self, tr("Recall Definition"), tr("Variable or function name:"))
         if not ok or not name.strip():
             return
         value = self.session.variables.get(normalize_name(name.strip()))

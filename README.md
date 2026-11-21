@@ -1,123 +1,94 @@
 # Complex Calc
 
-An open-source CAS calculator for Linux, made for practising school maths
-(statistics, equation solving, calculus) on a PC.
+A CAS calculator for Linux that feels like the TI-Nspire™ CX CAS, so you can
+practise school maths on your PC when the real thing isn't around.
 
-Complex Calc **uses command syntax similar to the TI-Nspire™ CX CAS**: the same
-command names and argument orders (`normCdf(lowBound,upBound,μ,σ)`,
-`binomCdf(n,p,lower,upper)`, `zInterval σ,x̄,n,CLevel`, `solve(…,x)`, …) and a
-numbered menu with the same paths (e.g. *Menu → 6 Statistics →
-5 Distributions → 2 Normal Cdf*). The design is the project's own.
+It **uses command syntax similar to the TI-Nspire™ CX CAS**: same command
+names, same argument order, and even the same numbered menu paths. So
+`normCdf(-∞,520,500,10)` just works, and *Menu → 5 → 5 → 2* still gets you to
+Normal Cdf. The looks are its own, though.
 
-> **Disclaimer:** This project is not affiliated with, endorsed by or sponsored
-> by Texas Instruments. TI-Nspire is a trademark of Texas Instruments
-> Incorporated. No TI firmware, OS files, ROMs, graphics, icons or fonts are
-> used or included.
+> **Disclaimer:** Not affiliated with, endorsed by or sponsored by Texas
+> Instruments. TI-Nspire is a trademark of Texas Instruments Incorporated. No TI
+> firmware, OS files, ROMs, graphics, icons or fonts are used or included.
 
 ## Why this exists
 
-I was studying for a maths exam without my calculator at hand, and I was
-surprised to find no open-source alternative for Linux that works the way the
-handheld does. So I decided to build one myself, together with Claude (an AI
-assistant).
+I was studying for a maths exam, didn't have my calculator with me, and found
+out there's no open-source option for Linux that works like the handheld.
+That annoyed me, so I built one together with Claude (an AI assistant).
 
-To be upfront: this project is largely AI-generated ("vibe-coded"). I steered
-the direction, set the requirements and tested it, but most of the code was
-written by Claude. Bug reports, corrections against the real device and pull
-requests are very welcome.
+Full honesty: this is mostly vibe-coded. I set the direction, wrote the
+requirements and tested it, but Claude wrote most of the code. If you spot
+something that behaves differently from the real device, please open an issue
+or a PR. That kind of feedback helps the most.
 
-## Features
+## What it can do
 
-The **command set** follows the official *TI-Nspire™ CX CAS Reference Guide*
-(v6.4): command names, argument order, optional arguments, keyboard
-shortcuts and the order of evaluation (EOS™). The guide's catalog has about
-400 entries. Almost all of them are implemented; see
-[`UNSURE_SYNTAX.md`](UNSURE_SYNTAX.md) for what is missing or unverified.
+The command set follows the official *TI-Nspire™ CX CAS Reference Guide*
+(v6.4). That's about 400 commands, and almost all of them are in. The few
+gaps, plus everything that couldn't be checked against a real device, are
+listed in [`UNSURE_SYNTAX.md`](UNSURE_SYNTAX.md).
 
-- **Calculator page:** entry line with history. Results are exact (CAS) or
-  decimal (Ctrl+Enter or `►Decimal`). Settings follow the handheld's Document
-  Settings: Float/Fix digits, Radian/Degree/Gradian,
-  Normal/Scientific/Engineering, Real/Rectangular/Polar, Auto/Exact/Approximate,
-  and Decimal/Hex/Binary base.
-- **CAS:** `solve`, `cSolve`, `nSolve`, `zeros`, `factor`, `expand`,
-  `completeSquare`, `propFrac`, `comDenom`, polynomial tools, `d`, `∫`, `limit`,
-  `Σ`, `Π`, `taylor`, `series`, `tangentLine`, `fMax`/`fMin`, `deSolve`, `euler`,
-  `rk23`, and more. The `|` operator works, e.g. `solve(sin(x)=1/2,x)|0≤x≤2π`.
+- **Calculator:** exact (CAS) or decimal results, with 2D math display
+  (fractions, roots, ∫, Σ, matrices). Also has a history, a catalog (Ctrl+K),
+  templates (Ctrl+T) and syntax help while you type.
+- **CAS:** `solve`, `cSolve`, `nSolve`, `factor`, `expand`, `d`, `∫`, `limit`,
+  `taylor`, `deSolve`, `fMax`/`fMin`, and the `|` operator, e.g.
+  `solve(sin(x)=1/2,x)|0≤x≤2π`.
 - **Statistics:**
-  - all distributions (normal, t, χ², F, binomial, Poisson, geometric, with
-    their inverses)
-  - all intervals and tests (z/t, 2-sample, proportions, χ² GOF/2-way, F, ANOVA,
-    ANOVA2way, linear and multiple regression tests)
-  - `OneVar`, `TwoVar`, and all regressions (linear, quadratic, cubic, quartic,
-    power, exponential, logarithmic, sinusoidal, logistic, median-median,
-    multiple)
-  - results go into `stat.*` variables
-- **Matrices & vectors:** `[1,2;3,4]`, `det`, `rref`, `^-1`, `ᵀ`, `eigVl`, `LU`,
-  `QR`, `simult`, `dotP`, `crossP`, and more.
-- **Lists & strings:** `seq`, `seqGen`, `countIf`, `sumIf`, `SortA`, `augment`,
-  `left`/`mid`/`right`, `&`, `format`, `expr`, and more.
-- **Finance:** `tvmN/I/PV/Pmt/FV`, `amortTbl`, `bal`, `ΣInt`, `ΣPrn`, `npv`,
-  `irr`, `mirr`, `eff`, `nom`, `dbd`, plus a Finance Solver dialog.
-- **Units & constants:** `3_m►_ft`, `_c`, `tmpCnv(100_°C,_°F)`.
-- **Programming (TI-Basic):** `Define f(x)=Func … EndFunc` and `Prgm … EndPrgm`
-  with `If`/`ElseIf`, `For`, `While`, `Loop`, `Try`, `Local`, `Return`,
-  `Disp`, `Request`, `Text`, `Goto`/`Lbl`, `Lock`, and `getMode`/`setMode`.
-  There is a Program Editor (Ctrl+E).
-- **CX II graphics commands:** `DrawLine`, `DrawCircle`, `FillRect`,
-  `PlotXY`, `SetColor`, `SetWindow`, and more, drawn on a 318×212 canvas.
-- **Numbered menu** (Ctrl+M) with assistant dialogs. The submenu order of the
-  statistics menus follows the official eGuide.
-- **Graphs page:**
-  - function, parametric, polar and scatter plots (f1…f99, shared with the
-    Calculator)
-  - Window/Zoom and Trace
-  - Analyze Graph: zero, minimum, maximum, intersection, inflection, dy/dx,
-    integral; you click the lower and the upper bound
-  - split-screen table
-  - linear, semi-log and log-log axes
-- **Lists & Spreadsheet page:**
-  - named columns are list variables shared with the Calculator
-  - column formulas (`=seq(n^2,n,1,10)`, `=a*2`) and cell formulas (`=a1+b1`)
-  - statistics wizards that write their results into the sheet
-  - Sort, Fill, Generate Sequence, and Quick Graph (scatter plot on the
-    Graphs page)
-- **Libraries:** documents in the MyLib folder with `Define LibPub`. Use them
-  as `lib\name(…)` or with `libShortcut`.
-- **REPL** for the terminal.
+  - all distributions (normal, t, χ², F, binomial, Poisson, geometric)
+  - all confidence intervals and tests (z, t, 2-sample, proportions, χ², F,
+    ANOVA)
+  - every regression (linear, quadratic, cubic, quartic, power, exponential,
+    logarithmic, sinusoidal, logistic and more)
+  - results land in `stat.*` variables
+- **Matrices, lists, strings, finance (TVM, amortization), units.**
+- **TI-Basic:** `Func`/`Prgm` with `If`, `For`, `While`, `Try`, `Local`,
+  `Disp`, `Request` and friends. Comes with a program editor (Ctrl+E) and the
+  CX II draw commands.
+- **Graphs:**
+  - function, parametric, polar and scatter plots
+  - zoom and trace
+  - Analyze Graph (zero, min, max, intersection, inflection, dy/dx, integral):
+    click the bounds like on the device
+  - value table
+  - linear and logarithmic axes
+- **Lists & Spreadsheet:** named columns are list variables shared with the
+  Calculator. Supports column formulas like `=seq(n^2,n,1,10)`, statistics
+  wizards, sorting and Quick Graph.
+- **Pages:** "1.1 Calculator", "1.2 Graphs" … all share the same variables.
+  Add a page with Ctrl+I.
+- **Languages:** English and German (*Settings → Language*, or
+  `complex-calc --lang de`).
+- **Terminal REPL** for when you don't want a window.
 
-Command names and variable names are case-insensitive (`NORMCDF` = `normCdf`).
-As on the handheld, the letters `e` and `i` are ordinary variables. Use `ℯ`
-(`@e`) and `ⅈ` (`@i`), or turn on *Settings → Typed e and i are constants*.
+Just like on the handheld, `e` and `i` are normal variables. Use `@e` / `@i`
+(or the ℯ / ⅈ buttons) for Euler's number and the imaginary unit, or flip the
+switch in the settings if that bugs you.
 
-## Installation
+## Install & run
 
-Requirements: Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/).
+You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/<you>/complex_calc.git
+git clone https://github.com/tkafka42/complex_calc.git
 cd complex_calc
-uv sync
-uv run complex-calc        # terminal REPL
-uv run complex-calc-gui    # GUI (native Wayland, falls back to X11)
+uv run complex-calc-gui    # the app (Wayland native, X11 works too)
+uv run complex-calc        # terminal version
 ```
 
-Without uv:
+Want it in your app launcher?
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-complex-calc
-```
-
-Optional desktop launcher:
-
-```bash
-uv tool install .   # puts complex-calc and complex-calc-gui on your PATH
+uv tool install .
 install -Dm644 data/complex_calc.desktop ~/.local/share/applications/complex_calc.desktop
 install -Dm644 data/complex_calc.svg ~/.local/share/icons/hicolor/scalable/apps/complex_calc.svg
 ```
 
-## Usage examples
+After pulling updates, run `uv tool install --reinstall .` again.
+
+## Quick taste
 
 ```
 › normCdf(-∞,520,500,10)
@@ -139,41 +110,34 @@ install -Dm644 data/complex_calc.svg ~/.local/share/icons/hicolor/scalable/apps/
   x=-√(3) or x=0 or x=√(3)
 ```
 
-REPL commands: `:help [name]`, `:menu [5 5]`, `:mode auto|exact|approx`,
-`:angle rad|deg|grad`, `:complex real|rectangular|polar`, `:digits N`, `:vars`,
-`:clear`, `:quit`. Start a line with `~` to get a decimal result.
+Handy shortcuts:
 
-Keyboard shortcuts, as listed in the reference guide: `sqrt(` → `√(`,
-`pi` → `π`, `@e` → `ℯ`, `@i` → `ⅈ`, `infinity` → `∞`, `<= >= /=` → `≤ ≥ ≠`,
-`=:` → `→`, `=>` → `⇒`, `<=>` → `⇔`, `@>` → `►`, `@t` → `ᵀ`, `@d` → `°`,
-`derivative(` → `d(`, `integral(` → `∫(`, `sumSeq(` → `Σ(`.
+| Keys | What it does |
+|---|---|
+| Ctrl+M | numbered menu |
+| Ctrl+K | catalog |
+| Ctrl+T | templates |
+| Ctrl+Enter | decimal result |
+| Ctrl+I | new page |
+| Ctrl+E | program editor |
 
-A small program:
+The keyboard shortcuts from the reference guide work too: `@e`, `@i`, `@>`
+(►), `=>`, `<=`, `infinity`, `sqrt(` and so on. In the REPL, `:help` shows
+everything.
 
-```
-Define fact(n)=Func:If n≤1 Then:Return 1:Else:Return n*fact(n-1):EndIf:EndFunc
-fact(10)
-```
-
-## Development
+## Hacking on it
 
 ```bash
 uv run pytest
 ```
 
-Project layout:
+- `src/complex_calc/core/`: parser, evaluator and formatting
+- `src/complex_calc/functions/`: all the commands
+- `src/complex_calc/gui/`: the PySide6 app
+- `src/complex_calc/menus.py`: the numbered menus and wizards
 
-```
-src/complex_calc/
-  core/        tokenizer, parser (EOS hierarchy, TI-Basic), session (evaluator), formatting
-  functions/   built-in functions: registry, elementary, cas, algebra, stats, stattests,
-               intervals, regression, matrices, lists, finance, units, conversions,
-               programming, draw, randoms, extras
-  menus.py     numbered menu tree + wizard definitions (shared by GUI and REPL)
-  cli/         REPL
-  gui/         PySide6 GUI
-tests/         pytest suite with reference values
-```
+PRs welcome. Corrections from people who own a real Nspire are especially
+welcome.
 
 ## License
 

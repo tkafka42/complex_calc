@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..menus import Wizard, WizardVariant
 
 
@@ -21,24 +22,25 @@ class MethodDialog(QDialog):
 
     def __init__(self, wizard: Wizard, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle(wizard.title)
+        self.setWindowTitle(tr(wizard.title))
         layout = QFormLayout(self)
         self.combo = QComboBox()
-        self.combo.addItems(list(wizard.variants))
-        layout.addRow("Data Input Method", self.combo)
+        self.combo.addItems([tr(v) for v in wizard.variants])
+        self._methods = list(wizard.variants)
+        layout.addRow(tr("Data Input Method"), self.combo)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addRow(buttons)
 
     def method(self) -> str:
-        return self.combo.currentText()
+        return self._methods[self.combo.currentIndex()]
 
 
 class WizardDialog(QDialog):
     def __init__(self, title: str, variant: WizardVariant, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle(title)
+        self.setWindowTitle(tr(title))
         self.variant = variant
         self.edits: dict[str, QLineEdit] = {}
         self.combos: dict[str, tuple[QComboBox, list[str]]] = {}
@@ -49,25 +51,25 @@ class WizardDialog(QDialog):
         for field in variant.fields:
             if field.choices:
                 combo = QComboBox()
-                combo.addItems([label for label, _ in field.choices])
+                combo.addItems([tr(label) for label, _ in field.choices])
                 values = [value for _, value in field.choices]
                 if field.default in values:
                     combo.setCurrentIndex(values.index(field.default))
-                form.addRow(field.label, combo)
+                form.addRow(tr(field.label), combo)
                 self.combos[field.key] = (combo, values)
                 continue
             edit = QLineEdit(field.default)
             edit.setMinimumWidth(260)
             if not field.enabled:
                 edit.setEnabled(False)
-                edit.setPlaceholderText("not supported")
+                edit.setPlaceholderText(tr("not supported"))
             elif field.optional:
-                edit.setPlaceholderText("optional")
-            form.addRow(field.label, edit)
+                edit.setPlaceholderText(tr("optional"))
+            form.addRow(tr(field.label), edit)
             self.edits[field.key] = edit
 
         has_lists = any("List" in f.label for f in variant.fields)
-        hint = QLabel("Lists: {1,2,3} or a list variable name." if has_lists else "∞ may be typed as inf.")
+        hint = QLabel(tr("Lists: {1,2,3} or a list variable name.") if has_lists else tr("∞ may be typed as inf."))
         hint.setObjectName("Hint")
         outer.addWidget(hint)
 

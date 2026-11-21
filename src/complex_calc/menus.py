@@ -671,6 +671,8 @@ def find_path(*keys: str) -> MenuItem:
 
 
 def render_tree(items: list[MenuItem] | None = None, indent: int = 0, max_depth: int = 9) -> str:
+    from .i18n import tr
+
     lines: list[str] = []
     for item in MENU if items is None else items:
         marks = ""
@@ -683,7 +685,7 @@ def render_tree(items: list[MenuItem] | None = None, indent: int = 0, max_depth:
             target = "  → wizard"
         elif item.insert:
             target = f"  → {item.insert.splitlines()[0]}"
-        lines.append(f"{'    ' * indent}{item.key}: {item.label}{target}{marks}")
+        lines.append(f"{'    ' * indent}{item.key}: {tr(item.label)}{target}{marks}")
         if item.children and indent + 1 < max_depth:
             lines.append(render_tree(item.children, indent + 1, max_depth))
     return "\n".join(lines)

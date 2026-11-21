@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from ..core.session import Session, normalize_name
 from ..core.values import UserProgram
+from ..i18n import tr
 
 TEMPLATE_HINT = (
     "Body (one statement per line), e.g.\n"
@@ -33,7 +34,7 @@ class ProgramEditor(QDialog):
     def __init__(self, session: Session, parent: QWidget | None = None, name: str = ""):
         super().__init__(parent)
         self.session = session
-        self.setWindowTitle("Program Editor")
+        self.setWindowTitle(tr("Program Editor"))
         self.resize(560, 520)
 
         layout = QVBoxLayout(self)
@@ -41,12 +42,12 @@ class ProgramEditor(QDialog):
         self.name_edit = QLineEdit(name)
         self.name_edit.setPlaceholderText("e.g. fact")
         self.kind_combo = QComboBox()
-        self.kind_combo.addItems(["Function (Func)", "Program (Prgm)"])
+        self.kind_combo.addItems([tr("Function (Func)"), tr("Program (Prgm)")])
         self.params_edit = QLineEdit()
         self.params_edit.setPlaceholderText("e.g. n   or   a,b")
-        form.addRow("Name", self.name_edit)
-        form.addRow("Type", self.kind_combo)
-        form.addRow("Parameters", self.params_edit)
+        form.addRow(tr("Name"), self.name_edit)
+        form.addRow(tr("Type"), self.kind_combo)
+        form.addRow(tr("Parameters"), self.params_edit)
         layout.addLayout(form)
 
         self.body = QPlainTextEdit()
@@ -56,13 +57,13 @@ class ProgramEditor(QDialog):
         self.body.setFont(font)
         layout.addWidget(self.body, 1)
 
-        self.status = QLabel("Ctrl+B: Check Syntax & Store")
+        self.status = QLabel(tr("Ctrl+B: Check Syntax & Store"))
         self.status.setObjectName("Hint")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
-        store_button = buttons.addButton("Check Syntax && Store", QDialogButtonBox.AcceptRole)
+        store_button = buttons.addButton(tr("Check Syntax && Store"), QDialogButtonBox.AcceptRole)
         store_button.clicked.connect(self.store)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -88,7 +89,7 @@ class ProgramEditor(QDialog):
     def store(self) -> None:
         name = self.name_edit.text().strip()
         if not name:
-            self.status.setText("Please enter a name.")
+            self.status.setText(tr("Please enter a name."))
             return
         entry = self.session.run(self.definition())
         if entry.error:

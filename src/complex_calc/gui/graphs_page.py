@@ -42,6 +42,7 @@ from ..analysis import graph_analysis as ga
 from ..core.formatting import format_expr, format_float
 from ..core.session import Session, normalize_name
 from ..core.values import ListValue, UserFunction
+from ..i18n import tr
 from ..menus import GRAPHS_MENU, MenuItem
 from .calculator_page import build_menu
 
@@ -83,7 +84,7 @@ class PendingAnalysis:
 class WindowDialog(QDialog):
     def __init__(self, window: Window, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Window Settings")
+        self.setWindowTitle(tr("Window Settings"))
         form = QFormLayout(self)
         self.edits = {}
         for key, label in (("xmin", "XMin"), ("xmax", "XMax"), ("xscale", "XScale"),
@@ -137,7 +138,7 @@ class GraphsPage(QWidget):
         self.function_list = QListWidget()
         self.function_list.itemChanged.connect(self._toggle_visible)
         self.function_list.itemDoubleClicked.connect(self._edit_item)
-        side_layout.addWidget(QLabel("Functions & plots"))
+        side_layout.addWidget(QLabel(tr("Functions & plots")))
         side_layout.addWidget(self.function_list, 1)
         self.table = QTableWidget(0, 1)
         self.table.hide()
@@ -146,12 +147,12 @@ class GraphsPage(QWidget):
         splitter.setSizes([700, 260])
         layout.addWidget(splitter, 1)
 
-        self.status = QLabel("Type a function and press Enter. Menu (Ctrl+M) → 6 Analyze Graph.")
+        self.status = QLabel(tr("Type a function and press Enter. Menu (Ctrl+M) → 6 Analyze Graph."))
         self.status.setObjectName("Hint")
         layout.addWidget(self.status)
 
         row = QHBoxLayout()
-        self.menu_button = QPushButton("Menu")
+        self.menu_button = QPushButton(tr("Menu"))
         self.menu_button.setObjectName("Primary")
         self.menu_button.setFocusPolicy(Qt.NoFocus)
         self.menu_button.clicked.connect(self.open_menu)
@@ -161,7 +162,7 @@ class GraphsPage(QWidget):
         self.name_combo.setFocusPolicy(Qt.NoFocus)
         row.addWidget(self.name_combo)
         self.entry = QLineEdit()
-        self.entry.setPlaceholderText("e.g. x^2-3   or   sin(x)   (Enter graphs the function)")
+        self.entry.setPlaceholderText(tr("e.g. x^2-3   or   sin(x)   (Enter graphs the function)"))
         self.entry.returnPressed.connect(self.submit_function)
         row.addWidget(self.entry, 1)
         layout.addLayout(row)
@@ -389,26 +390,26 @@ class GraphsPage(QWidget):
     def _choose_function(self, title: str, exclude: int | None = None) -> int | None:
         options = [k for k, p in enumerate(self.plots) if p.kind == "function" and p.visible and k != exclude]
         if not options:
-            QMessageBox.information(self, title, "Please graph a function first.")
+            QMessageBox.information(self, title, tr("Please graph a function first."))
             return None
         if len(options) == 1:
             return options[0]
         labels = [self.plots[k].label for k in options]
-        choice, ok = QInputDialog.getItem(self, title, "Select graph:", labels, 0, False)
+        choice, ok = QInputDialog.getItem(self, title, tr("Select graph:"), labels, 0, False)
         return options[labels.index(choice)] if ok else None
 
     def _start(self, action: str, needs_two: bool = False):
-        index = self._choose_function("Analyze Graph")
+        index = self._choose_function(tr("Analyze Graph"))
         if index is None:
             return
         other = None
         if needs_two:
-            other = self._choose_function("Second graph", exclude=index)
+            other = self._choose_function(tr("Second graph"), exclude=index)
             if other is None:
                 return
         self.pending = PendingAnalysis(action, index, other)
-        prompt = "Click the point" if action == "dydx" else "Click the lower bound"
-        self.status.setText(f"{prompt} (on the graph).")
+        prompt = tr("Click the point") if action == "dydx" else tr("Click the lower bound")
+        self.status.setText(f"{prompt} {tr('(on the graph).')}")
         self.canvas.setFocus()
 
     def _analysis_click(self, x: float):
@@ -417,7 +418,7 @@ class GraphsPage(QWidget):
         pending.clicks.append(float(x))
         needed = 1 if pending.action == "dydx" else 2
         if len(pending.clicks) < needed:
-            self.status.setText("Click the upper bound.")
+            self.status.setText(tr("Click the upper bound."))
             return
         self.pending = None
         plot = self.plots[pending.plot_index]
@@ -605,7 +606,7 @@ class GraphsPage(QWidget):
         self._set_window(w.xmin, w.xmax, lo - pad, hi + pad)
 
     def action_g_trace(self):
-        index = self._choose_function("Graph Trace")
+        index = self._choose_function(tr("Graph Trace"))
         if index is None:
             return
         self.trace_index = index

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from ..core.session import Session
 from ..core.values import ListValue, StatResults, StringValue
 from ..core.formatting import stat_table
+from ..i18n import tr
 from ..menus import LISTS_MENU, MenuItem
 from ..spreadsheet import COLUMNS, Sheet
 from .calculator_page import build_menu
@@ -48,13 +49,13 @@ class ListsPage(QWidget):
         layout.addWidget(self.table, 1)
 
         bottom = QHBoxLayout()
-        self.menu_button = QPushButton("Menu")
+        self.menu_button = QPushButton(tr("Menu"))
         self.menu_button.setObjectName("Primary")
         self.menu_button.setFocusPolicy(Qt.NoFocus)
         self.menu_button.clicked.connect(self.open_menu)
         bottom.addWidget(self.menu_button)
-        self.status = QLabel("Row 'name': list name (shared with the Calculator).  Row '◆': column formula, "
-                             "e.g. =seq(n^2,n,1,10).  Cells: values or =a1*2.")
+        self.status = QLabel(tr("Row 'name': list name (shared with the Calculator).  Row '◆': column formula, "
+                                "e.g. =seq(n^2,n,1,10).  Cells: values or =a1*2."))
         self.status.setObjectName("Hint")
         self.status.setWordWrap(True)
         bottom.addWidget(self.status, 1)

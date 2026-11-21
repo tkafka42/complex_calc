@@ -14,7 +14,12 @@ def main() -> int:
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtWidgets import QApplication
 
+    from PySide6.QtCore import QSettings
+
+    from ..i18n import detect_language, set_language
     from .main_window import APP_NAME, MainWindow
+
+    set_language(str(QSettings("complex_calc", "complex_calc").value("language", detect_language())))
     from .theme import current_palette, stylesheet
 
     app = QApplication(sys.argv)

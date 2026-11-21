@@ -41,6 +41,38 @@ Programs: separate statements with ":" e.g.
 """
 
 
+HELP_DE = """\
+Complex Calc — Befehle
+  <Ausdruck>             berechnen, z. B. solve(x^2-4=0,x)  oder  zInterval 15,100,25,0.95
+  ~<Ausdruck>            näherungsweise berechnen (wie Strg+Enter in der GUI)
+  :help [Name]           diese Hilfe oder die Syntax einer Funktion (z. B. :help normCdf)
+  :list                  alle Funktionen und Befehle
+  :menu [Tasten]         nummeriertes Menü anzeigen, z. B. :menu 5 5
+  :mode auto|exact|approx
+  :angle rad|deg|grad
+  :complex real|rectangular|polar
+  :digits N              angezeigte Ziffern (Float N), Standard 6
+  :vars                  definierte Variablen anzeigen
+  :clear                 alle Variablen löschen
+  :refreshlib            Bibliotheken aktualisieren (Ordner MyLib, Aufruf lib\\name(...))
+  :lang de|en            Sprache
+  :quit                  beenden (auch Strg+D)
+
+Tastaturkürzel (wie im Reference Guide): sqrt( → √(  pi → π  @e → ℯ
+@i → ⅈ  infinity → ∞  <= >= /= → ≤ ≥ ≠  =: → →  => → ⇒  @> → ►  @t → ᵀ
+derivative( → d(  integral( → ∫(  sumSeq( → Σ(  deltaList( → ΔList(
+Hinweis: Wie am Gerät sind die Buchstaben e und i normale Variablen.
+Programme: Anweisungen mit ":" trennen, z. B.
+  Define f(n)=Func:If n≤1 Then:Return 1:Else:Return n*f(n-1):EndIf:EndFunc
+"""
+
+
+def _help_text() -> str:
+    from ..i18n import language
+
+    return HELP_DE if language() == "de" else HELP
+
+
 def _history_file() -> Path:
     base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
     return base / "complex_calc" / "history"
@@ -81,13 +113,19 @@ def handle_command(session: Session, line: str) -> str | None:
     """Handle a ':' command. Returns text to print, or None to quit."""
     parts = line[1:].split()
     if not parts:
-        return HELP
+        return _help_text()
     cmd, args = parts[0].lower(), parts[1:]
     if cmd in ("q", "quit", "exit"):
         return None
+    if cmd in ("lang", "language", "sprache"):
+        from ..i18n import LANGUAGES, language, set_language
+
+        if args and args[0].lower() in LANGUAGES:
+            set_language(args[0].lower())
+        return f"language={language()}"
     if cmd in ("h", "help", "?"):
         if not args:
-            return HELP
+            return _help_text()
         spec = lookup_builtin(args[0])
         if spec is None:
             return f"Unknown function '{args[0]}'"
@@ -147,7 +185,11 @@ def process_line(session: Session, line: str) -> str | None:
     force_approx = False
     if line.startswith("~"):
         force_approx, line = True, line[1:].strip()
+    from ..i18n import tr_error
+
     entry = session.run(line, force_approx=force_approx)
+    if entry.error:
+        entry.text = tr_error(entry.text)
     lines = [*entry.output]
     if entry.drawing:
         import tempfile
@@ -165,8 +207,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="complex-calc", description="CAS calculator REPL")
     parser.add_argument("-c", "--command", action="append", help="evaluate and exit (repeatable)")
     parser.add_argument("--deg", action="store_true", help="start in degree mode")
+    parser.add_argument("--lang", choices=["en", "de"], help="language (default: from the system locale)")
     parser.add_argument("--version", action="version", version=f"complex_calc {__version__}")
     options = parser.parse_args(argv)
+    from ..i18n import detect_language, set_language
+
+    set_language(options.lang or detect_language())
 
     session = Session()
 
@@ -201,7 +247,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     rl = _setup_readline()
-    print(f"Complex Calc {__version__} — type :help for help, :quit to exit")
+    from ..i18n import language
+
+    print(f"Complex Calc {__version__} — " + (":help für Hilfe, :quit zum Beenden" if language() == "de"
+                                              else "type :help for help, :quit to exit"))
     print(_settings_line(session))
     try:
         while True:
