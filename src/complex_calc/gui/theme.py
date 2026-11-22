@@ -56,6 +56,11 @@ def current_palette() -> Palette:
     """The palette of the last applied stylesheet (or the system's light/dark scheme)."""
     if _active is not None:
         return _active
+    return system_palette()
+
+
+def system_palette() -> Palette:
+    """LIGHT or DARK, following the desktop's color scheme."""
     hints = QGuiApplication.styleHints()
     try:
         if hints.colorScheme() == Qt.ColorScheme.Dark:
@@ -65,11 +70,37 @@ def current_palette() -> Palette:
     return LIGHT
 
 
+def qpalette(p: Palette):
+    """A fully opaque QPalette, so no widget or popup is ever see-through."""
+    from PySide6.QtGui import QColor, QPalette
+
+    palette = QPalette()
+    roles = {
+        QPalette.Window: p.background, QPalette.Base: p.surface, QPalette.AlternateBase: p.surface_alt,
+        QPalette.Button: p.surface_alt, QPalette.ToolTipBase: p.surface, QPalette.WindowText: p.text,
+        QPalette.Text: p.text, QPalette.ButtonText: p.text, QPalette.ToolTipText: p.text,
+        QPalette.BrightText: p.text, QPalette.PlaceholderText: p.muted, QPalette.Highlight: p.accent,
+        QPalette.HighlightedText: p.accent_text, QPalette.Light: p.surface, QPalette.Midlight: p.surface_alt,
+        QPalette.Mid: p.border, QPalette.Dark: p.border, QPalette.Shadow: p.border,
+    }
+    for group in (QPalette.Active, QPalette.Inactive, QPalette.Disabled):
+        for role, color in roles.items():
+            qcolor = QColor(color)
+            qcolor.setAlpha(255)
+            if group == QPalette.Disabled and role in (QPalette.Text, QPalette.WindowText, QPalette.ButtonText):
+                qcolor = QColor(p.muted)
+            palette.setColor(group, role, qcolor)
+    return palette
+
+
 def stylesheet(p: Palette) -> str:
     global _active
     _active = p
     return f"""
-    QMainWindow, QDialog, QWidget#Page {{ background: {p.background}; color: {p.text}; }}
+    QMainWindow, QDialog, QMessageBox, QInputDialog, QWidget#Page, QStackedWidget, QTabWidget::pane,
+    QSplitter, QStatusBar, QAbstractScrollArea {{ background: {p.background}; color: {p.text}; }}
+    QToolTip {{ background: {p.surface}; color: {p.text}; border: 1px solid {p.border}; }}
+    QDialog#TemplatePalette {{ background: {p.surface}; border: 1px solid {p.border}; }}
     QWidget {{ color: {p.text}; font-size: 11pt; }}
     QMenuBar {{ background: {p.surface}; color: {p.text}; border-bottom: 1px solid {p.border}; }}
     QMenuBar::item {{ background: transparent; padding: 4px 10px; }}

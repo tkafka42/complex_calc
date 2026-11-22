@@ -128,6 +128,9 @@ class TemplatePalette(QDialog):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent, Qt.Popup)
+        self.setObjectName("TemplatePalette")
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        self.setAutoFillBackground(True)
         grid = QGridLayout(self)
         grid.setSpacing(4)
         for k, (label, text, offset) in enumerate(TEMPLATES):

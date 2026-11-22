@@ -14,13 +14,13 @@ def main() -> int:
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtWidgets import QApplication
 
-    from PySide6.QtCore import QSettings
+    from PySide6.QtCore import QSettings, Qt
 
     from ..i18n import detect_language, set_language
     from .main_window import APP_NAME, MainWindow
 
     set_language(str(QSettings("complex_calc", "complex_calc").value("language", detect_language())))
-    from .theme import current_palette, stylesheet
+    from .theme import qpalette, stylesheet, system_palette
 
     app = QApplication(sys.argv)
     app.setApplicationName("complex_calc")
@@ -28,7 +28,9 @@ def main() -> int:
     QGuiApplication.setDesktopFileName("complex_calc")  # matches data/complex_calc.desktop (Wayland app-id)
 
     def apply_theme(*_):
-        app.setStyleSheet(stylesheet(current_palette()))
+        palette = system_palette()
+        app.setPalette(qpalette(palette))  # opaque colors for every widget, menu and popup
+        app.setStyleSheet(stylesheet(palette))
 
     apply_theme()
     try:
@@ -37,6 +39,8 @@ def main() -> int:
         pass
 
     window = MainWindow()
+    window.setAttribute(Qt.WA_TranslucentBackground, False)
+    window.setAutoFillBackground(True)
     window.show()
     return app.exec()
 

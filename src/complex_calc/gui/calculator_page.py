@@ -246,6 +246,8 @@ class EntryLine(QLineEdit):
 def build_menu(parent: QWidget, items: list[MenuItem], on_select) -> QMenu:
     """Build a QMenu whose keys 1–9/A–K work as mnemonics, like on a handheld."""
     menu = QMenu(parent)
+    menu.setAttribute(Qt.WA_TranslucentBackground, False)
+    menu.setAutoFillBackground(True)
     for item in items:
         label = f"&{item.key}: {tr(item.label).replace('&', '&&')}"
         if item.unsure:
